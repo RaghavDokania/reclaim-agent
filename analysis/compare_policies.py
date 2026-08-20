@@ -21,9 +21,11 @@ from datetime import datetime, timedelta, timezone
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "decide"))
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "act"))
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "diagnose"))
 
 from policy import MAX_ATTEMPTS, decide  # noqa: E402
 from simulate_outcome import ASSUMED_SUCCESS_RATES  # noqa: E402
+from classifier import classify  # noqa: E402
 
 BATCH_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "failed_payments.json")
 
@@ -47,7 +49,12 @@ def _run_naive_retry_all(payments, rng):
     attempts = 0
 
     for payment in payments:
-        for _ in range(MAX_ATTEMPTS):
+        # Held to the same lifetime attempt budget the agent is held to by
+        # decide()'s attempt_count >= MAX_ATTEMPTS check -- otherwise naive
+        # gets a larger budget just for ignoring prior attempts, and the
+        # comparison measures budget instead of strategy.
+        remaining_budget = max(0, MAX_ATTEMPTS - payment["attempt_count"])
+        for _ in range(remaining_budget):
             attempts += 1
             if rng.random() < ASSUMED_SUCCESS_RATES[NAIVE_ACTION]:
                 recovered_count += 1
@@ -69,6 +76,12 @@ def _run_agent_policy(payments, rng):
     for payment in payments:
         created_at = _parse_created_at(payment["created_at"])
         attempt_count = payment["attempt_count"]
+        # Route on the classifier's predicted cause, the same signal the
+        # live pipeline acts on -- not payment["root_cause"], which is a
+        # synthetic ground-truth label the agent would never see in
+        # production. Using the label would credit the agent with
+        # diagnoses it sometimes gets wrong, overstating it.
+        predicted_root_cause = classify(payment["error_reason"], payment["error_code"]).root_cause
         # Evaluate each payment from the moment it failed, then let the
         # policy's own delays advance the clock -- this is what the live
         # pipeline does across repeated runs, compressed into one pass.
@@ -76,7 +89,7 @@ def _run_agent_policy(payments, rng):
 
         while True:
             decision = decide(
-                root_cause=payment["root_cause"],
+                root_cause=predicted_root_cause,
                 created_at=created_at,
                 attempt_count=attempt_count,
                 now=now,
