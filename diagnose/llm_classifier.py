@@ -28,7 +28,7 @@ VALID_ROOT_CAUSES = {
     "expired_card",
 }
 
-GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_MODEL = "openai/gpt-oss-120b"
 
 PROMPT_TEMPLATE = """You are triaging a failed payment for an Indian payment gateway.
 
