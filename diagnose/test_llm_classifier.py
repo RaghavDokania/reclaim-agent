@@ -100,6 +100,26 @@ def test_the_prompt_asks_the_model_for_its_own_confidence():
     assert "confidence" in captured["prompt"]
 
 
+def test_the_prompt_gives_the_model_the_concrete_ambiguous_case_as_an_example():
+    # Measured live, the model returned "high" on 14 of 15 escalations and
+    # on all 5 of the diagnoses it got wrong -- every one of them on
+    # "Transaction declined by bank", the exact phrase the escalation layer
+    # exists for. An abstract instruction to be honest was not enough, so
+    # the prompt names that case and the two causes it straddles.
+    captured = {}
+
+    def fake_llm(prompt):
+        captured["prompt"] = prompt
+        return '{"root_cause": "auth_failure", "confidence": "low", "reasoning": "ok"}'
+
+    classify_with_llm("Transaction declined by bank", "GATEWAY_ERROR", llm_func=fake_llm)
+    prompt = captured["prompt"]
+    assert "Transaction declined by bank" in prompt
+    assert "card_declined_by_issuer" in prompt and "auth_failure" in prompt
+    # The rule must be stated as an obligation, not a suggestion.
+    assert "must" in prompt.lower()
+
+
 def test_llm_returning_an_invalid_root_cause_falls_back_to_error_code():
     def fake_llm(prompt):
         return '{"root_cause": "customer_changed_their_mind", "reasoning": "made up"}'

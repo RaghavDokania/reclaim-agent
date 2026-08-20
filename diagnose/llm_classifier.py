@@ -46,13 +46,31 @@ Classify the failure into exactly one of these root causes:
 - network_timeout: a gateway or bank connectivity problem, not a customer problem
 - expired_card: the card's expiry date has passed
 
-Also report how sure you are:
-- "high": the reason text clearly points at one of the five causes
-- "low": the reason text genuinely does not distinguish between two or
-  more causes, and you are picking the more likely one rather than the
-  certain one. Say "low" when that is true -- a low-confidence answer is
-  routed to a human for review, so it costs nothing to be honest, while a
-  wrong "high" causes money to move on a guess.
+Also report how sure you are. Apply this test before you answer: read the
+reason text and ask whether it is consistent with more than one of the
+five causes above.
+- "high": ONLY if the reason text names evidence that rules out every
+  cause but one. The text must distinguish, not merely suggest.
+- "low": if the reason text is consistent with two or more causes. You
+  MUST still name your single best guess in root_cause -- "low" describes
+  how sure you are, it is not permission to refuse or to hedge the cause
+  field. Naming a best guess does NOT make your confidence high.
+
+You MUST answer "low" whenever the text is consistent with more than one
+cause, even if one feels more likely. Worked example, which is the most
+common case you will see:
+
+  Error reason: "Transaction declined by bank"
+  This says the bank refused the transaction but not WHY. A refusal after
+  a failed OTP or 3D Secure step reads exactly the same way as an
+  issuer-side refusal, so the text is consistent with BOTH
+  card_declined_by_issuer AND auth_failure. It does not distinguish them.
+  Correct answer: root_cause "card_declined_by_issuer" (the best guess),
+  confidence "low".
+
+A "low" answer is routed to a human for review, so it costs nothing to be
+honest. A wrong "high" causes money to move on a guess. When in doubt
+between the two, answer "low".
 
 Error code: {error_code}
 Error reason: {error_reason}
