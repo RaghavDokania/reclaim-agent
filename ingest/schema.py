@@ -30,6 +30,8 @@ class Status(str, Enum):
     ACTION_TAKEN = "action_taken"
     RECOVERED = "recovered"
     EXHAUSTED = "exhausted"   # hit stopping rule, gave up
+    NEEDS_REVIEW = "needs_review"        # low-confidence diagnosis, held for a human
+    NEEDS_APPROVAL = "needs_approval"    # high-value, held for explicit sign-off
 
 
 # Maps each root cause to who/what it stems from -- your diagnosis layer

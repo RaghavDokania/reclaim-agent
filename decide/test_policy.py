@@ -61,3 +61,42 @@ def test_still_eligible_just_under_72_hours():
     created_at = NOW - timedelta(hours=71)
     result = decide("network_timeout", created_at, attempt_count=1, now=NOW)
     assert result.status == "action_taken"
+
+
+def test_low_confidence_diagnosis_routes_to_review_instead_of_acting():
+    result = decide("auth_failure", NOW, attempt_count=1, now=NOW, confidence="low")
+    assert result.status == "needs_review"
+    assert result.action is None
+    assert result.next_action_at is None
+    assert "confidence" in result.reason.lower()
+
+
+def test_high_value_payment_routes_to_approval_instead_of_acting():
+    result = decide("auth_failure", NOW, attempt_count=1, now=NOW, amount_inr=25000.0)
+    assert result.status == "needs_approval"
+    assert result.action is None
+    assert result.next_action_at is None
+    assert "20,000" in result.reason or "20000" in result.reason
+
+
+def test_payment_just_under_the_high_value_threshold_still_acts():
+    result = decide("auth_failure", NOW, attempt_count=1, now=NOW, amount_inr=19999.0)
+    assert result.status == "action_taken"
+
+
+def test_stopping_rules_take_precedence_over_the_new_gates():
+    # An exhausted payment is finished -- it must not be resurrected into a
+    # review queue by a low-confidence diagnosis.
+    result = decide("auth_failure", NOW, attempt_count=3, now=NOW, confidence="low", amount_inr=25000.0)
+    assert result.status == "exhausted"
+
+
+def test_confidence_gate_takes_precedence_over_the_value_gate():
+    result = decide("auth_failure", NOW, attempt_count=1, now=NOW, confidence="low", amount_inr=25000.0)
+    assert result.status == "needs_review"
+
+
+def test_defaults_preserve_the_original_behaviour():
+    result = decide("network_timeout", NOW, attempt_count=1, now=NOW)
+    assert result.status == "action_taken"
+    assert result.action == "retry_payment"

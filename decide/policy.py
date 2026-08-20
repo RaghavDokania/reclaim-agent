@@ -13,6 +13,7 @@ from typing import Optional
 
 MAX_ATTEMPTS = 3
 STOPPING_WINDOW_HOURS = 72
+HIGH_VALUE_THRESHOLD_INR = 20000.0
 
 # root_cause -> (action, delay_hours before the action is eligible to run)
 POLICY = {
@@ -27,12 +28,19 @@ POLICY = {
 @dataclass
 class DecisionResult:
     action: Optional[str]
-    status: str                    # "action_taken" | "exhausted"
+    status: str                    # "action_taken" | "exhausted" | "needs_review" | "needs_approval"
     next_action_at: Optional[datetime]
     reason: str
 
 
-def decide(root_cause: str, created_at: datetime, attempt_count: int, now: datetime) -> DecisionResult:
+def decide(
+    root_cause: str,
+    created_at: datetime,
+    attempt_count: int,
+    now: datetime,
+    confidence: str = "high",
+    amount_inr: float = 0.0,
+) -> DecisionResult:
     if attempt_count >= MAX_ATTEMPTS:
         return DecisionResult(
             action=None, status="exhausted", next_action_at=None,
@@ -44,6 +52,21 @@ def decide(root_cause: str, created_at: datetime, attempt_count: int, now: datet
         return DecisionResult(
             action=None, status="exhausted", next_action_at=None,
             reason=f"older than {STOPPING_WINDOW_HOURS}h stopping window ({age_hours:.1f}h old)",
+        )
+
+    # Gates below hold a payment back from an automatic money action. They
+    # come after the stopping rules on purpose: a payment that is already
+    # finished stays finished rather than landing in a human queue.
+    if confidence == "low":
+        return DecisionResult(
+            action=None, status="needs_review", next_action_at=None,
+            reason="low confidence diagnosis -- not acting on a guess, routing to human review",
+        )
+
+    if amount_inr >= HIGH_VALUE_THRESHOLD_INR:
+        return DecisionResult(
+            action=None, status="needs_approval", next_action_at=None,
+            reason=f"amount Rs {amount_inr:,.2f} is at or above the Rs {HIGH_VALUE_THRESHOLD_INR:,.0f} auto-action threshold",
         )
 
     action, delay_hours = POLICY[root_cause]

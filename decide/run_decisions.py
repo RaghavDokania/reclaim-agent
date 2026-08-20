@@ -42,6 +42,8 @@ def decide_all(client):
             created_at=created_at,
             attempt_count=row["attempt_count"],
             now=now,
+            confidence=row.get("diagnosis_confidence") or "high",
+            amount_inr=row["amount_inr"],
         )
 
         update_payment(
@@ -52,7 +54,12 @@ def decide_all(client):
             next_action_at=result.next_action_at.isoformat() if result.next_action_at else None,
         )
 
-        event = "decided" if result.status == "action_taken" else "exhausted"
+        event = {
+            "action_taken": "decided",
+            "exhausted": "exhausted",
+            "needs_review": "held_for_review",
+            "needs_approval": "held_for_approval",
+        }[result.status]
         log_event(
             client,
             row["payment_id"],
