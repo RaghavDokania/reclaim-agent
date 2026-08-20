@@ -15,7 +15,8 @@ from dataclasses import dataclass
 class ClassificationResult:
     root_cause: str
     confidence: str   # "high" | "low"
-    method: str        # "keyword" | "code_fallback"
+    method: str        # "keyword" | "llm" | "code_fallback"
+    reasoning: str | None = None
 
 
 KEYWORD_RULES = {

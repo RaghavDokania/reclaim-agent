@@ -9,6 +9,7 @@ create table if not exists failed_payments (
     error_reason         text,
     root_cause           text not null,        -- ground truth (synthetic data only)
     predicted_root_cause text,                  -- what your classifier said
+    diagnosis_confidence text,                  -- "high" | "low", drives the decide layer's review gate
     created_at           timestamptz not null,
     customer_email       text,
     customer_phone       text,

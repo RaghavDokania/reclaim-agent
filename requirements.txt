@@ -4,7 +4,7 @@ supabase          # for the audit trail / metrics database
 
 # Add these once you get to the diagnosis/decision layer
 langchain
-langchain-anthropic   # or langchain-groq, whichever LLM you're wiring in
+langchain-groq        # LLM escalation for ambiguous failure reasons
 python-dotenv         # keep your API keys out of committed code
 
 # Dev / testing

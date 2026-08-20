@@ -17,7 +17,7 @@ from collections import Counter
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "log"))
 from db import get_client, log_event, update_payment  # noqa: E402
 
-from classifier import classify
+from llm_classifier import classify_with_llm
 
 
 def diagnose_all(client):
@@ -30,12 +30,13 @@ def diagnose_all(client):
     )
 
     for row in rows:
-        result = classify(row["error_reason"], row["error_code"])
+        result = classify_with_llm(row["error_reason"], row["error_code"])
 
         update_payment(
             client,
             row["payment_id"],
             predicted_root_cause=result.root_cause,
+            diagnosis_confidence=result.confidence,
             status="diagnosed",
         )
         log_event(
@@ -46,6 +47,7 @@ def diagnose_all(client):
                 "predicted_root_cause": result.root_cause,
                 "confidence": result.confidence,
                 "method": result.method,
+                "reasoning": result.reasoning,
             },
         )
 
@@ -70,6 +72,19 @@ def print_accuracy_report(client):
 
     print(f"\n{total} payment(s) currently in 'diagnosed' status")
     print(f"Accuracy vs. synthetic ground truth: {correct}/{total} ({correct / total * 100:.1f}%)")
+
+    events = (
+        client.table("audit_log")
+        .select("payment_id, detail")
+        .eq("event", "diagnosed")
+        .execute()
+        .data
+    )
+    methods = Counter(e["detail"].get("method") for e in events if e.get("detail"))
+    if methods:
+        print("\nDiagnosis method breakdown (all diagnosed events):")
+        for method, n in methods.most_common():
+            print(f"  {method:16s} {n}")
 
     confusions = Counter(
         (r["root_cause"], r["predicted_root_cause"])
