@@ -8,10 +8,14 @@ script those statuses are a dead end -- run_decisions.py only picks up
 'diagnosed' rows and run_actions.py only 'action_taken' ones, so a held
 payment sits there forever and the escalation is nominal rather than real.
 
-Releasing a payment sets its status back to 'diagnosed' and writes a
-'human_approved' audit event, so the trail shows a person authorised the
-action rather than the agent deciding it was fine after all. The next
-run_decisions.py pass then decides it normally.
+Releasing a payment sets its status back to 'diagnosed', stamps
+human_approved_at, and writes a 'human_approved' audit event, so the
+trail shows a person authorised the action rather than the agent deciding
+it was fine after all. The next run_decisions.py pass reads that stamp
+and stands the gates down for that payment -- without it the same gate
+re-fires and the release is a no-op loop. The stopping rules still apply:
+approval authorises acting on a payment, it does not resurrect one that
+is out of attempts or past the 72h chase window.
 
 Run:
     python approve.py --list
@@ -21,6 +25,7 @@ Run:
 import argparse
 import os
 import sys
+from datetime import datetime, timezone
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "log"))
 from db import get_client, log_event, update_payment  # noqa: E402
@@ -57,7 +62,13 @@ def approve(client, payment_id: str):
     if row["status"] not in HELD_STATUSES:
         return None
 
-    update_payment(client, payment_id, status="diagnosed")
+    # human_approved_at is the durable half of the release. Flipping status
+    # alone is a no-op: the next run_decisions.py pass re-reads the row and
+    # re-applies the very gate that held it, putting the payment straight
+    # back into the queue. Written in the SAME update as the status so the
+    # row is never briefly 'diagnosed' without its approval stamp.
+    approved_at = datetime.now(timezone.utc).isoformat()
+    update_payment(client, payment_id, status="diagnosed", human_approved_at=approved_at)
     log_event(
         client,
         payment_id,
@@ -67,6 +78,7 @@ def approve(client, payment_id: str):
             "amount_inr": row["amount_inr"],
             "predicted_root_cause": row.get("predicted_root_cause"),
             "diagnosis_confidence": row.get("diagnosis_confidence"),
+            "human_approved_at": approved_at,
             "note": "human released this payment for automated action",
         },
     )

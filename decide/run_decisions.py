@@ -61,6 +61,11 @@ def decide_all(client):
             now=now,
             confidence=confidence,
             amount_inr=row["amount_inr"],
+            # Set by decide/approve.py when a person released this payment.
+            # Without it the gate that held the row re-fires here and the
+            # release is a no-op loop -- needs_approval -> diagnosed ->
+            # needs_approval, forever.
+            human_approved=bool(row.get("human_approved_at")),
         )
 
         update_payment(

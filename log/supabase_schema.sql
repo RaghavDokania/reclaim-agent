@@ -17,6 +17,7 @@ create table if not exists failed_payments (
     status               text not null default 'needs_diagnosis',
     action_taken         text,
     next_action_at       timestamptz,          -- when the act layer should execute action_taken
+    human_approved_at    timestamptz,          -- set by decide/approve.py; stands the confidence and value gates down for this row (stopping rules still apply)
     recovered_amount_inr numeric,
     updated_at           timestamptz default now()
 );

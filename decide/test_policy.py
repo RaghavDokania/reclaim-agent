@@ -126,3 +126,67 @@ def test_defaults_preserve_the_original_behaviour():
     result = decide("network_timeout", NOW, attempt_count=1, now=NOW)
     assert result.status == "action_taken"
     assert result.action == "retry_payment"
+
+
+# --- human approval ---------------------------------------------------
+# A human releasing a held payment is only meaningful if the gate that
+# held it then stands down. Without a durable approval signal the same
+# gate re-fires on the next decide pass and the payment loops back into
+# the queue forever, so these pin the release actually releasing.
+
+def test_human_approved_high_value_payment_is_actioned_instead_of_held():
+    result = decide(
+        "auth_failure", NOW, attempt_count=1, now=NOW,
+        amount_inr=25000.0, human_approved=True,
+    )
+    assert result.status == "action_taken"
+    assert result.action == "send_payment_link"
+    assert result.next_action_at == NOW
+
+
+def test_human_approved_low_confidence_payment_is_actioned_instead_of_held():
+    result = decide(
+        "auth_failure", NOW, attempt_count=1, now=NOW,
+        confidence="low", human_approved=True,
+    )
+    assert result.status == "action_taken"
+    assert result.action == "send_payment_link"
+
+
+def test_human_approved_reason_records_that_a_human_authorised_it():
+    # The audit trail has to say why the gate did not fire, otherwise the
+    # log shows a Rs 25,000 payment auto-actioning with no explanation.
+    result = decide(
+        "auth_failure", NOW, attempt_count=1, now=NOW,
+        confidence="low", amount_inr=25000.0, human_approved=True,
+    )
+    assert result.status == "action_taken"
+    assert "human" in result.reason.lower()
+
+
+def test_human_approval_does_not_resurrect_a_payment_out_of_attempts():
+    # Approval authorises acting on a payment; it does not undo a
+    # stopping rule. The stopping rules still come first.
+    result = decide(
+        "auth_failure", NOW, attempt_count=3, now=NOW,
+        amount_inr=25000.0, human_approved=True,
+    )
+    assert result.status == "exhausted"
+    assert result.action is None
+
+
+def test_human_approval_does_not_resurrect_a_payment_past_the_72h_window():
+    created_at = NOW - timedelta(hours=73)
+    result = decide(
+        "auth_failure", created_at, attempt_count=1, now=NOW,
+        confidence="low", amount_inr=25000.0, human_approved=True,
+    )
+    assert result.status == "exhausted"
+    assert result.action is None
+
+
+def test_human_approved_defaults_to_false_and_the_gates_still_fire():
+    held = decide("auth_failure", NOW, attempt_count=1, now=NOW, amount_inr=25000.0)
+    assert held.status == "needs_approval"
+    reviewed = decide("auth_failure", NOW, attempt_count=1, now=NOW, confidence="low")
+    assert reviewed.status == "needs_review"

@@ -118,3 +118,24 @@ def test_every_logged_event_carries_the_confidence_provenance():
     for event in client.events:
         assert "confidence" in event["detail"], event["event"]
         assert "confidence_defaulted" in event["detail"], event["event"]
+
+
+def test_a_row_stamped_human_approved_at_is_actioned_not_re_held():
+    # The release loop: approve.py sends a held payment back to
+    # 'diagnosed', decide_all re-reads it, and without honouring the
+    # approval stamp the same value gate puts it straight back into
+    # needs_approval. Nothing held could ever be recovered.
+    client = _FakeClient([
+        _row("pay_1", amount_inr=25000.0, human_approved_at=FRESH),
+    ])
+    total, counts = decide_all(client)
+
+    assert counts["action_taken"] == 1
+    assert "decided" in _details_by_event(client)
+
+
+def test_a_row_without_the_approval_stamp_is_still_held():
+    client = _FakeClient([_row("pay_1", amount_inr=25000.0, human_approved_at=None)])
+    total, counts = decide_all(client)
+
+    assert counts["needs_approval"] == 1
