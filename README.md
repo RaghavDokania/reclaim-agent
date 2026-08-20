@@ -67,6 +67,10 @@ Every simulated outcome is flagged `simulated: true` with the rate used, logged 
 1. `pip install -r requirements.txt`
 2. Create a Supabase project, run `log/supabase_schema.sql` in its SQL Editor, then any files in `log/migrations/` in order.
 3. Get a Razorpay test-mode API key (Test Mode → Settings → API Keys → Generate Test Key — no KYC needed).
+
+   > **⚠️ Razorpay test mode caps payment links at 30 per account — for the lifetime of the account, not per run.** It is not a rate limit and waiting does not reset it. A full sweep of this batch can request up to ~38 payment links (17 `auth_failure` + 14 `card_declined_by_issuer` → `send_payment_link`, plus 7 `expired_card` → `prompt_card_update`, before any retries), so a reproducer running the batch through cleanly **will** hit the cap.
+   >
+   > When you do, Razorpay raises `ServerError: test mode limit of 30 reached for payment_link`. The act layer catches that **per row**: it logs an `action_error` audit event, leaves the payment's status untouched so it is retried on a later run, and carries on with the rest of the batch. The run is not wrong and no state is corrupted — the affected payments simply stay in `action_taken` instead of reaching `recovered` or `exhausted`, so the recovery figure understates what the policy would have achieved. `retry_payment` uses Razorpay **Orders**, which are not capped this way and keep working.
 4. Get a Groq API key from [console.groq.com](https://console.groq.com) (free tier is enough) for the diagnosis layer's LLM escalation.
 5. Copy `.env.example` to `.env` and fill in all five keys:
 
