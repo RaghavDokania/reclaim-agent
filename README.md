@@ -24,8 +24,13 @@ ingest  ->  diagnose  ->  decide  ->  act  ->  log (throughout)
 ```
 
 - **`ingest/`** — generates a synthetic batch of failed payments (5 root causes, realistic proportions, deliberately varied and sometimes-ambiguous free-text error reasons) and loads it into Supabase.
-- **`diagnose/`** — a keyword-based classifier guesses the root cause from the free-text `error_reason`, falling back to a coarser `error_code`-based guess when the text is ambiguous. Runs at **89.3% accuracy** on the committed batch — a real, non-circular number (see [Why 89.3% and not 100%](#why-893-and-not-100)).
-- **`decide/`** — maps each diagnosed root cause to a bounded recovery action (retry, payment link, or card-update prompt), gated by a stopping rule: max 3 attempts, and nothing older than 72 hours gets chased.
+- **`diagnose/`** — a two-layer router. A keyword classifier resolves unambiguous `error_reason` text deterministically and for free, scoring **89.3% on its own** (67/75 on the committed batch — a real, non-circular number, see [Why 89.3% and not 100%](#why-893-and-not-100)). The 15 of 75 reasons it *can't* resolve — text matching no category or more than one — escalate to an LLM (Groq, `openai/gpt-oss-120b`) that returns both a root cause and **its own confidence**, so a model that genuinely can't tell two causes apart says so instead of guessing. Any LLM failure degrades to the same `error_code` fallback, so a diagnosis is always produced.
+- **`decide/`** — maps each diagnosed root cause to a bounded recovery action (retry, payment link, or card-update prompt), subject to three controls applied in order:
+  - **stopping rules** — max 3 lifetime attempts, and nothing older than 72 hours gets chased;
+  - **confidence gate** — a low-confidence diagnosis goes to human review (`needs_review`) instead of moving money on a guess;
+  - **value gate** — anything at or above **₹20,000** needs human approval (`needs_approval`) instead of auto-executing. On the committed batch that's 17 payments, ₹3,80,957.32 deliberately withheld from automation.
+
+  Held payments are not a dead end: `python decide/approve.py --list` shows the queue and `--approve <payment_id>` releases one back into the pipeline, logging a `human_approved` audit event that records a person authorised it.
 - **`act/`** — executes the decided action as a **real Razorpay test-mode API call** (an Order for retries, a Payment Link for the other two actions — both visible in the Razorpay test dashboard). Whether the customer actually completes it is the one part no backend agent can automate (see [Why some outcomes are simulated](#why-some-outcomes-are-simulated)) — that step is explicitly simulated using documented, stated success-rate assumptions, never hidden.
 - **`log/`** — every stage writes to Supabase's `audit_log` table. Pull any `payment_id` and you can see every action taken on it and why, from `ingested` to its final state.
 
@@ -41,7 +46,9 @@ Safe to re-run anytime — each stage only touches rows in the status it cares a
 
 The first version of the classifier scored 100% — because the same person wrote both the synthetic data's failure-reason strings and the classifier's keyword rules, so they trivially matched. That's not a real accuracy number, it's a circular one.
 
-The fix: `ingest/generate_synthetic_batch.py` draws each failure's `error_reason` from a pool of 4-5 realistic phrasings per category, a few of which are deliberately ambiguous across categories (e.g. "Transaction declined by bank" could plausibly mean either an issuer decline or an auth failure — even a human reading that line honestly couldn't tell). The classifier's rules in `diagnose/classifier.py` were written independently from general knowledge of how banks phrase declines, not copied from the generator. Result: a genuine 89.3% (67/75), and every misclassification clusters on that one ambiguous phrase — explainable, not arbitrary.
+The fix: `ingest/generate_synthetic_batch.py` draws each failure's `error_reason` from a pool of 4-5 realistic phrasings per category, a few of which are deliberately ambiguous across categories (e.g. "Transaction declined by bank" could plausibly mean either an issuer decline or an auth failure — even a human reading that line honestly couldn't tell). The classifier's rules in `diagnose/classifier.py` were written independently from general knowledge of how banks phrase declines, not copied from the generator. Result: a genuine 89.3% (67/75) for the keyword layer alone, and every misclassification clusters on that one ambiguous phrase — explainable, not arbitrary.
+
+That 89.3% is the *keyword layer's* score, measured offline and reproducible with no API key. It is exactly the population the LLM layer exists for: the 15 reasons the rules can't resolve are where the escalation earns its keep, and the end-to-end number depends on a live model call, so it is reported from a run rather than hardcoded here.
 
 ## Why some outcomes are simulated
 
@@ -60,8 +67,19 @@ Every simulated outcome is flagged `simulated: true` with the rate used, logged 
 1. `pip install -r requirements.txt`
 2. Create a Supabase project, run `log/supabase_schema.sql` in its SQL Editor, then any files in `log/migrations/` in order.
 3. Get a Razorpay test-mode API key (Test Mode → Settings → API Keys → Generate Test Key — no KYC needed).
-4. Copy `.env.example` to `.env` and fill in `SUPABASE_URL`, `SUPABASE_KEY`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`.
-5. `cd ingest && python generate_synthetic_batch.py && python load_batch.py`
+4. Get a Groq API key from [console.groq.com](https://console.groq.com) (free tier is enough) for the diagnosis layer's LLM escalation.
+5. Copy `.env.example` to `.env` and fill in all five keys:
+
+   | Key | Used by | Required? |
+   |---|---|---|
+   | `SUPABASE_URL` | `log/db.py` | Yes — nothing runs without it |
+   | `SUPABASE_KEY` | `log/db.py` | Yes — nothing runs without it |
+   | `RAZORPAY_KEY_ID` | `act/razorpay_client.py` | Yes, for the act layer |
+   | `RAZORPAY_KEY_SECRET` | `act/razorpay_client.py` | Yes, for the act layer |
+   | `GROQ_API_KEY` | `diagnose/llm_classifier.py` | Yes, for LLM escalation — see below |
+
+   **If `GROQ_API_KEY` is missing, the pipeline does not crash — it quietly gets worse.** `_default_llm` raises `KeyError` looking the key up, `classify_with_llm` catches it like any other LLM failure, and every ambiguous payment falls back to a coarse `error_code` guess marked low-confidence. Those then hit the confidence gate and pile up in `needs_review` instead of being recovered. The run looks successful and recovers less, so set the key.
+6. `cd ingest && python generate_synthetic_batch.py && python load_batch.py`
 
 ## Reproducing the metrics
 
@@ -76,17 +94,40 @@ from log.db import get_client, get_metrics
 print(get_metrics(get_client()))
 ```
 
-Re-run `run_pipeline.py` periodically to let delayed retries (up to 6h for `insufficient_funds`) and failed-attempt loop-backs settle — the batch reaches a stable final state once nothing remains in `needs_diagnosis`, `diagnosed`, or an eligible `action_taken`.
+Alongside the recovery figures, `get_metrics()` reports `held_for_review_count`, `held_for_approval_count` and `held_amount_inr` — money the agent deliberately did not touch. Held payments are excluded from `still_in_progress`, because nothing is pending on them: they are waiting on a person, and `decide/approve.py --list` is where you find them.
+
+Re-run `run_pipeline.py` periodically to let delayed retries (up to 6h for `insufficient_funds`) and failed-attempt loop-backs settle — the batch reaches a stable final state once nothing remains in `needs_diagnosis`, `diagnosed`, or an eligible `action_taken`. Held payments stay held until a human releases them.
+
+## Comparing policies (offline)
+
+A recovery number means nothing without a counterfactual. `analysis/compare_policies.py` replays the committed batch under four policies, entirely offline — no Supabase, no Razorpay, no API key:
+
+```bash
+cd analysis && python compare_policies.py
+```
+
+| Policy | What it is |
+|---|---|
+| `do_nothing` | The floor. Recovers nothing. |
+| `naive_retry_all` | Retry everything, immediately, regardless of cause — held to the same lifetime attempt budget as the agent, so the comparison measures strategy and not budget. |
+| `agent_routing_ungated` | **Not what the agent ships.** The agent's cause-aware routing and timing with the confidence and value gates *switched off*. It exists to isolate one question — does routing on a diagnosed cause beat retrying blindly? — with the compliance controls held constant on both arms. Any lift it reports is a lift for the routing strategy alone and is labelled as such in the output. |
+| `agent_gated` | What the live pipeline actually runs: `decide()` called with the diagnosis confidence and the payment amount, so low-confidence and high-value payments are held for a human. |
+
+**How to read it.** The routing-only lift answers "is cause-aware routing worth building?" and must always be quoted with the gates-off caveat — quoting it as the shipped agent's lift would be dishonest, since the gates deliberately withhold the batch's largest payments from automation. `agent_gated` is therefore reported as **two** figures — recovered automatically, and held for human sign-off — rather than one lift number. Money held for approval is the gate working, not money lost, and it is never counted as recovered.
+
+Outcomes are drawn from the same assumed completion rates the act layer uses, keyed per `(seed, payment_id)` so every policy faces identical luck on a given payment. The run is byte-for-byte reproducible across processes, and the routing-only lift is reported as a median and range across 20 seeds rather than one cherry-picked draw.
 
 ## Testing
 
 ```bash
-python -m pytest diagnose/test_classifier.py decide/test_policy.py act/test_simulate_outcome.py
+python -m pytest
 ```
 
-23 tests covering the classifier's keyword/fallback logic, the decision policy's action mapping and stopping rules, and the simulated-outcome rates — all pure functions, no network required.
+70 tests, no network required — nothing in the suite reaches Supabase, Razorpay, or Groq. They cover the classifier's keyword/fallback logic, the LLM router's confidence mapping and its degrade-to-fallback paths, the decision policy's action mapping, stopping rules and both gates (including the exact ₹20,000 boundary), the audit detail written for every decision, the metrics arithmetic, the simulated-outcome rates, and the policy-comparison harness's determinism and accounting.
 
 ## What this doesn't do (yet)
 
 - No live dashboard — the audit trail is queryable directly via Supabase's Table Editor or `get_metrics()`.
 - Only operates on the synthetic batch — wiring to real Razorpay webhook events (rather than a generated batch) would be the natural next step past this buildathon submission.
+- The LLM is a *router*, not an agent with a budget: it reads one ambiguous failure reason and returns a cause plus a confidence. It never chooses an action, never sees an amount, and never talks to Razorpay. Every money action comes from the deterministic policy table in `decide/policy.py`, which is why each one can be explained and bounded.
+- The human approval queue is a CLI (`decide/approve.py`), not a UI — a real deployment would put the held queue in front of an ops team rather than behind a terminal.
