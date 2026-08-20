@@ -17,6 +17,7 @@ import time
 from datetime import datetime, timezone
 
 import razorpay
+import requests
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "log"))
 from db import get_client as get_supabase_client, log_event, update_payment  # noqa: E402
@@ -31,6 +32,22 @@ from simulate_outcome import simulate_outcome  # noqa: E402
 # Razorpay test mode rate-limits aggressively; a short pause between calls
 # keeps a 20-30 row batch from tripping it.
 DELAY_BETWEEN_CALLS_SECONDS = 1.5
+
+# Every way a single payment's API call can fail without it being this
+# batch's problem. Razorpay's SDK deliberately defines NO shared base
+# class -- BadRequestError, GatewayError, ServerError and
+# SignatureVerificationError each subclass Exception directly -- so the
+# tuple is built from the module rather than named one by one, and a
+# future error class is caught the day it is added. requests covers the
+# transport layer underneath it (connection reset, DNS, read timeout).
+#
+# Catching only BadRequestError is what let a ServerError ("test mode
+# limit of 30 reached for payment_link") escape and kill a whole run,
+# stranding 12 payments in 'action_taken'.
+RECOVERABLE_API_ERRORS = tuple(
+    obj for obj in vars(razorpay.errors).values()
+    if isinstance(obj, type) and issubclass(obj, Exception)
+) + (requests.exceptions.RequestException,)
 
 LINK_REASONS = {
     "send_payment_link": "please retry your payment",
@@ -61,10 +78,12 @@ def run_eligible_actions(supabase, razorpay_client):
                 artifact = create_retry_order(razorpay_client, payment_id, amount)
             else:
                 artifact = create_recovery_payment_link(razorpay_client, payment_id, amount, LINK_REASONS[action])
-        except razorpay.errors.BadRequestError as e:
-            # Razorpay test-mode rate limit or a bad payload -- leave the
-            # row's status untouched so it's picked up and retried on the
-            # next run, rather than losing the batch or corrupting state.
+        except RECOVERABLE_API_ERRORS as e:
+            # Razorpay test-mode rate limit, a quota ceiling, a 5xx, or a
+            # transport failure -- leave the row's status untouched so it's
+            # picked up and retried on the next run, rather than losing the
+            # batch or corrupting state. One payment's API failure must
+            # never be able to end the run.
             log_event(supabase, payment_id, "action_error", {"action": action, "error": str(e)})
             results["api_error_skipped"] += 1
             time.sleep(DELAY_BETWEEN_CALLS_SECONDS)
