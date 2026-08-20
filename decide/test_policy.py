@@ -79,6 +79,18 @@ def test_high_value_payment_routes_to_approval_instead_of_acting():
     assert "20,000" in result.reason or "20000" in result.reason
 
 
+def test_payment_exactly_at_the_high_value_threshold_needs_approval():
+    # The threshold is inclusive: Rs 20,000 exactly is the boundary the
+    # policy claims to hold, so the boundary itself must be held. Tested
+    # explicitly because "at or above" is exactly the claim a reviewer
+    # checks, and an off-by-one here auto-actions a payment nobody
+    # authorised.
+    result = decide("auth_failure", NOW, attempt_count=1, now=NOW, amount_inr=20000.0)
+    assert result.status == "needs_approval"
+    assert result.action is None
+    assert result.next_action_at is None
+
+
 def test_payment_just_under_the_high_value_threshold_still_acts():
     result = decide("auth_failure", NOW, attempt_count=1, now=NOW, amount_inr=19999.0)
     assert result.status == "action_taken"
@@ -89,6 +101,20 @@ def test_stopping_rules_take_precedence_over_the_new_gates():
     # review queue by a low-confidence diagnosis.
     result = decide("auth_failure", NOW, attempt_count=3, now=NOW, confidence="low", amount_inr=25000.0)
     assert result.status == "exhausted"
+
+
+def test_age_exhaustion_takes_precedence_over_both_gates():
+    # The attempt-exhaustion equivalent is covered above; this pins the
+    # other stopping rule against the same combination. A payment past the
+    # 72h window is finished and must not be resurrected into a human
+    # queue by either gate.
+    created_at = NOW - timedelta(hours=73)
+    result = decide(
+        "auth_failure", created_at, attempt_count=1, now=NOW,
+        confidence="low", amount_inr=25000.0,
+    )
+    assert result.status == "exhausted"
+    assert result.action is None
 
 
 def test_confidence_gate_takes_precedence_over_the_value_gate():

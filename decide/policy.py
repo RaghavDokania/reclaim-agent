@@ -1,9 +1,22 @@
 """
 Decision layer for the reclaim-agent pipeline.
 
-Maps a diagnosed root cause to a bounded recovery action, gated by a
-stopping rule so the agent never chases a payment indefinitely. This
-module only decides -- it never calls Razorpay or touches Supabase;
+Maps a diagnosed root cause to a bounded recovery action, subject to
+three controls applied in this order:
+
+1. Stopping rules -- at most MAX_ATTEMPTS lifetime attempts, and nothing
+   older than STOPPING_WINDOW_HOURS gets chased, so the agent never
+   pursues a payment indefinitely.
+2. Confidence gate -- a low-confidence diagnosis is routed to human
+   review rather than acted on, so money never moves on a guess.
+3. Value gate -- anything at or above HIGH_VALUE_THRESHOLD_INR needs
+   human approval rather than auto-executing.
+
+The stopping rules come first on purpose: a payment that is already
+finished stays finished rather than landing in a human queue. The two
+gates return no action; decide/approve.py is how a human releases one.
+
+This module only decides -- it never calls Razorpay or touches Supabase;
 that's run_decisions.py's job.
 """
 

@@ -2,8 +2,7 @@
 razorpay          # official Python SDK, for test-mode API calls
 supabase          # for the audit trail / metrics database
 
-# Add these once you get to the diagnosis/decision layer
-langchain
+# Diagnosis / decision layer
 langchain-groq        # LLM escalation for ambiguous failure reasons
 python-dotenv         # keep your API keys out of committed code
 

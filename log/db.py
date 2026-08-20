@@ -46,21 +46,34 @@ def update_payment(client: Client, payment_id: str, **fields):
 
 def get_metrics(client: Client) -> dict:
     """The number you lead your pitch with: batch size, recovery rate,
-    and rupees recovered, computed straight from the table."""
+    and rupees recovered, computed straight from the table.
+
+    Payments the decide layer held back for a human (needs_review from the
+    confidence gate, needs_approval from the value gate) are reported on
+    their own and excluded from still_in_progress -- nothing is pending on
+    them, they are waiting on a person, and counting them as in-progress
+    would overstate what the pipeline is still working."""
     rows = client.table("failed_payments").select("*").execute().data
 
     total = len(rows)
     recovered = [r for r in rows if r["status"] == "recovered"]
     exhausted = [r for r in rows if r["status"] == "exhausted"]
+    held_for_review = [r for r in rows if r["status"] == "needs_review"]
+    held_for_approval = [r for r in rows if r["status"] == "needs_approval"]
+    held = held_for_review + held_for_approval
 
     total_at_risk = sum(r["amount_inr"] for r in rows)
     total_recovered = sum(r["recovered_amount_inr"] or 0 for r in recovered)
+    total_held = sum(r["amount_inr"] for r in held)
 
     return {
         "total_batch_size": total,
         "recovered_count": len(recovered),
         "exhausted_count": len(exhausted),
-        "still_in_progress": total - len(recovered) - len(exhausted),
+        "held_for_review_count": len(held_for_review),
+        "held_for_approval_count": len(held_for_approval),
+        "held_amount_inr": round(total_held, 2),
+        "still_in_progress": total - len(recovered) - len(exhausted) - len(held),
         "recovery_rate_pct": round(len(recovered) / total * 100, 1) if total else 0,
         "total_amount_at_risk_inr": round(total_at_risk, 2),
         "total_amount_recovered_inr": round(total_recovered, 2),
