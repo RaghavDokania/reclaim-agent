@@ -16,6 +16,7 @@ Run:
 import json
 import os
 import random
+import statistics
 import sys
 from datetime import datetime, timedelta, timezone
 
@@ -33,22 +34,35 @@ BATCH_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "failed_payme
 # the strategy a team ships before thinking about root causes.
 NAIVE_ACTION = "retry_payment"
 
+# Fixed seed list for the multi-seed summary in main(): a single seed's
+# lift is a point estimate that invites "why that seed?" -- this reports
+# the median and range across many, so the headline number is defensible.
+COMPARISON_SEEDS = list(range(1, 21))
+
 
 def _parse_created_at(raw: str) -> datetime:
     parsed = datetime.fromisoformat(raw)
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
-def _run_do_nothing(payments, rng):
+def _run_do_nothing(payments, seed):
     return {"recovered_count": 0, "recovered_inr": 0.0, "attempts": 0}
 
 
-def _run_naive_retry_all(payments, rng):
+def _run_naive_retry_all(payments, seed):
     recovered_count = 0
     recovered_inr = 0.0
     attempts = 0
 
     for payment in payments:
+        # Keyed to (seed, payment_id) rather than drawn from one stream
+        # shared across the whole batch -- otherwise how many draws one
+        # payment consumes shifts the stream offset for every later
+        # payment (and, since the two policies' per-payment draw counts
+        # diverge whenever their success thresholds differ, for the other
+        # policy's comparison to this one too). Keying per payment means
+        # what happens to payment N can never shift payment N+1's draws.
+        rng = random.Random(f"{seed}:{payment['payment_id']}")
         # Held to the same lifetime attempt budget the agent is held to by
         # decide()'s attempt_count >= MAX_ATTEMPTS check -- otherwise naive
         # gets a larger budget just for ignoring prior attempts, and the
@@ -68,12 +82,15 @@ def _run_naive_retry_all(payments, rng):
     }
 
 
-def _run_agent_policy(payments, rng):
+def _run_agent_policy(payments, seed):
     recovered_count = 0
     recovered_inr = 0.0
     attempts = 0
 
     for payment in payments:
+        # See _run_naive_retry_all for why this is keyed per payment
+        # rather than drawn from one stream shared across the batch.
+        rng = random.Random(f"{seed}:{payment['payment_id']}")
         created_at = _parse_created_at(payment["created_at"])
         attempt_count = payment["attempt_count"]
         # Route on the classifier's predicted cause, the same signal the
@@ -123,10 +140,37 @@ POLICIES = {
 def run_comparison(payments, seed: int = 42) -> dict:
     results = {}
     for name, runner in POLICIES.items():
-        # Each policy gets its own identically-seeded RNG so they face the
-        # same luck -- otherwise the comparison measures the seed, not the policy.
-        results[name] = runner(payments, random.Random(seed))
+        # Each runner keys its own per-payment RNGs off this seed (see
+        # _run_naive_retry_all) so every policy faces the same luck for a
+        # given payment -- otherwise the comparison measures the seed,
+        # not the policy.
+        results[name] = runner(payments, seed)
     return results
+
+
+def multi_seed_summary(payments, seeds=COMPARISON_SEEDS) -> dict:
+    """Reports the agent-vs-naive lift across many seeds instead of one.
+
+    A single seed's lift is a point estimate -- quoting it alone invites
+    "why that seed?". This runs the full comparison once per seed and
+    summarizes the distribution of lifts, so the headline number is
+    "median lift across N seeds, ranging X to Y" rather than one draw.
+    """
+    lift_pcts = []
+    for seed in seeds:
+        results = run_comparison(payments, seed=seed)
+        naive = results["naive_retry_all"]["recovered_inr"]
+        agent = results["agent_policy"]["recovered_inr"]
+        if naive:
+            lift_pcts.append((agent - naive) / naive * 100)
+
+    return {
+        "seeds": list(seeds),
+        "lift_pcts": lift_pcts,
+        "median_lift_pct": round(statistics.median(lift_pcts), 1),
+        "min_lift_pct": round(min(lift_pcts), 1),
+        "max_lift_pct": round(max(lift_pcts), 1),
+    }
 
 
 def main():
@@ -145,7 +189,14 @@ def main():
     naive = results["naive_retry_all"]["recovered_inr"]
     agent = results["agent_policy"]["recovered_inr"]
     if naive:
-        print(f"\nAgent policy vs naive retry-all: {(agent - naive) / naive * 100:+.1f}% recovered")
+        print(f"\nAgent policy vs naive retry-all (seed=42): {(agent - naive) / naive * 100:+.1f}% recovered")
+
+    summary = multi_seed_summary(payments, COMPARISON_SEEDS)
+    print(
+        f"\nAcross {len(COMPARISON_SEEDS)} seeds ({COMPARISON_SEEDS[0]}-{COMPARISON_SEEDS[-1]}): "
+        f"median lift {summary['median_lift_pct']:+.1f}%, "
+        f"range {summary['min_lift_pct']:+.1f}% to {summary['max_lift_pct']:+.1f}%"
+    )
 
 
 if __name__ == "__main__":

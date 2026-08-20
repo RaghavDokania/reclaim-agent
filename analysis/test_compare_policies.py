@@ -1,4 +1,4 @@
-from compare_policies import run_comparison
+from compare_policies import COMPARISON_SEEDS, multi_seed_summary, run_comparison
 
 BATCH = [
     {
@@ -95,3 +95,79 @@ def test_agent_policy_routes_on_classified_cause_not_the_root_cause_label():
     matching_results = run_comparison(matching_batch, seed=42)
 
     assert contradictory_results["agent_policy"] == matching_results["agent_policy"]
+
+
+def test_a_payments_result_is_independent_of_other_payments_in_the_batch():
+    # Randomness must be keyed per (seed, payment_id), not drawn from one
+    # shared stream per policy -- otherwise how many draws one payment
+    # consumes shifts every later payment's draws, and a batch's result
+    # stops being the sum of each payment's own, isolated result. This is
+    # the additivity that per-payment-keyed randomness guarantees and a
+    # single shared stream does not. (A 2-payment batch isn't enough to
+    # expose this reliably -- the first payment in any batch always sits
+    # at draw 0 of a shared stream, so it takes several payments before
+    # a shared stream's cumulative drift shows up.)
+    sub_batch = BATCH[:10]
+    combined = run_comparison(sub_batch, seed=42)
+    isolated_sum = {
+        policy: {
+            "recovered_count": sum(
+                run_comparison([p], seed=42)[policy]["recovered_count"] for p in sub_batch
+            ),
+            "attempts": sum(
+                run_comparison([p], seed=42)[policy]["attempts"] for p in sub_batch
+            ),
+        }
+        for policy in ("naive_retry_all", "agent_policy")
+    }
+
+    for policy in ("naive_retry_all", "agent_policy"):
+        assert combined[policy]["recovered_count"] == isolated_sum[policy]["recovered_count"]
+        assert combined[policy]["attempts"] == isolated_sum[policy]["attempts"]
+
+
+def test_reordering_the_batch_does_not_change_the_result():
+    # A corollary of per-payment-keyed randomness: the outcome for the
+    # batch as a whole cannot depend on what order the payments are
+    # processed in. A batch of content-identical payments can't expose an
+    # ordering bug (swapping two identical items is a no-op), so this uses
+    # a heterogeneous batch mixing several root causes / amounts.
+    reasons_and_codes = [
+        ("the request timed out while contacting the bank", "SERVER_ERROR"),
+        ("authentication failed via otp", "GATEWAY_ERROR"),
+        ("card declined by the issuing bank", "GATEWAY_ERROR"),
+        ("the card has expired", "BAD_REQUEST_ERROR"),
+        ("insufficient balance in account", "BAD_REQUEST_ERROR"),
+    ]
+    mixed_batch = [
+        {
+            "payment_id": f"pay_{i}",
+            "amount_inr": 1000.0 + i,
+            "root_cause": "unused",
+            "error_reason": reasons_and_codes[i % len(reasons_and_codes)][0],
+            "error_code": reasons_and_codes[i % len(reasons_and_codes)][1],
+            "created_at": "2026-08-20T10:00:00+00:00",
+            "attempt_count": 1,
+        }
+        for i in range(15)
+    ]
+
+    forward = run_comparison(mixed_batch, seed=42)
+    backward = run_comparison(list(reversed(mixed_batch)), seed=42)
+    assert forward == backward
+
+
+def test_comparison_seeds_is_a_fixed_list_of_at_least_twenty_seeds():
+    assert isinstance(COMPARISON_SEEDS, list)
+    assert len(COMPARISON_SEEDS) >= 20
+    assert len(set(COMPARISON_SEEDS)) == len(COMPARISON_SEEDS)  # no duplicates
+
+
+def test_multi_seed_summary_is_deterministic():
+    assert multi_seed_summary(BATCH, COMPARISON_SEEDS) == multi_seed_summary(BATCH, COMPARISON_SEEDS)
+
+
+def test_multi_seed_summary_reports_median_and_range_consistently():
+    summary = multi_seed_summary(BATCH, COMPARISON_SEEDS)
+    assert summary["min_lift_pct"] <= summary["median_lift_pct"] <= summary["max_lift_pct"]
+    assert len(summary["lift_pcts"]) == len(COMPARISON_SEEDS)
