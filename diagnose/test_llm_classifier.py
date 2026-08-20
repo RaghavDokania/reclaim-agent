@@ -1,5 +1,3 @@
-import pytest
-
 from llm_classifier import classify_with_llm
 
 VALID = {
@@ -19,8 +17,12 @@ def test_clear_keyword_match_never_calls_the_llm():
 
 
 def test_ambiguous_reason_escalates_to_the_llm():
+    # The stub now reports its own confidence, because the model is asked
+    # for one. A response that omits the field no longer means "high" -- it
+    # means unknown, which maps to "low"; see the omitted-field test below.
     def fake_llm(prompt):
-        return '{"root_cause": "card_declined_by_issuer", "reasoning": "issuer-side decline"}'
+        return ('{"root_cause": "card_declined_by_issuer", "confidence": "high", '
+                '"reasoning": "issuer-side decline"}')
 
     result = classify_with_llm("Transaction declined by bank", "GATEWAY_ERROR", llm_func=fake_llm)
     assert result.root_cause == "card_declined_by_issuer"
@@ -39,6 +41,63 @@ def test_llm_prompt_contains_the_error_reason_and_code():
     classify_with_llm("Transaction declined by bank", "GATEWAY_ERROR", llm_func=fake_llm)
     assert "Transaction declined by bank" in captured["prompt"]
     assert "GATEWAY_ERROR" in captured["prompt"]
+
+
+def test_llm_reporting_low_confidence_is_recorded_as_low_confidence():
+    # The confidence gate exists to stop the agent acting on a guess. If the
+    # model says the reason text does not distinguish two causes, that has
+    # to reach decide() as "low" rather than being overwritten with "high".
+    def fake_llm(prompt):
+        return ('{"root_cause": "card_declined_by_issuer", "confidence": "low", '
+                '"reasoning": "could equally be an auth failure"}')
+
+    result = classify_with_llm("Transaction declined by bank", "GATEWAY_ERROR", llm_func=fake_llm)
+    assert result.confidence == "low"
+    assert result.root_cause == "card_declined_by_issuer"
+    assert result.method == "llm"
+
+
+def test_llm_reporting_high_confidence_is_recorded_as_high_confidence():
+    def fake_llm(prompt):
+        return ('{"root_cause": "expired_card", "confidence": "high", '
+                '"reasoning": "the reason names an expiry date"}')
+
+    result = classify_with_llm("Transaction declined by bank", "GATEWAY_ERROR", llm_func=fake_llm)
+    assert result.confidence == "high"
+    assert result.method == "llm"
+
+
+def test_llm_omitting_the_confidence_field_is_treated_as_low_confidence():
+    # A missing confidence means we do not know how sure the model was, and
+    # the safe direction for an unknown is human review, not a money action.
+    def fake_llm(prompt):
+        return '{"root_cause": "auth_failure", "reasoning": "otp not entered"}'
+
+    result = classify_with_llm("Transaction declined by bank", "GATEWAY_ERROR", llm_func=fake_llm)
+    assert result.confidence == "low"
+    assert result.root_cause == "auth_failure"
+    assert result.method == "llm"
+
+
+def test_llm_returning_an_unrecognised_confidence_value_is_treated_as_low():
+    def fake_llm(prompt):
+        return ('{"root_cause": "auth_failure", "confidence": "pretty sure tbh", '
+                '"reasoning": "otp not entered"}')
+
+    result = classify_with_llm("Transaction declined by bank", "GATEWAY_ERROR", llm_func=fake_llm)
+    assert result.confidence == "low"
+    assert result.method == "llm"
+
+
+def test_the_prompt_asks_the_model_for_its_own_confidence():
+    captured = {}
+
+    def fake_llm(prompt):
+        captured["prompt"] = prompt
+        return '{"root_cause": "auth_failure", "confidence": "high", "reasoning": "ok"}'
+
+    classify_with_llm("Transaction declined by bank", "GATEWAY_ERROR", llm_func=fake_llm)
+    assert "confidence" in captured["prompt"]
 
 
 def test_llm_returning_an_invalid_root_cause_falls_back_to_error_code():

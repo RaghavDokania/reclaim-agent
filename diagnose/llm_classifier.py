@@ -4,9 +4,16 @@ LLM escalation layer for root-cause diagnosis.
 The rule-based classifier in classifier.py handles unambiguous failure
 reasons deterministically and for free. Only reasons it cannot resolve --
 text that matches no category, or more than one -- escalate here, where a
-model reads the reason and picks a cause. Roughly one failure in eight
-reaches this path, so the LLM cost stays proportional to the genuinely
-hard cases rather than the whole batch.
+model reads the reason and picks a cause. Measured on the committed batch
+in data/failed_payments.json, 15 of 75 failures (one in five) reach this
+path, so the LLM cost stays proportional to the genuinely hard cases
+rather than the whole batch.
+
+The model is asked for its own confidence, not just a cause. That answer
+is what decide()'s confidence gate acts on, so a model that cannot tell
+two causes apart routes the payment to a human instead of to a money
+action. An absent or unrecognised confidence is read as "low" -- an
+unknown is not evidence of certainty.
 
 Any LLM failure (unreachable, malformed output, a made-up category)
 degrades to the same error_code fallback the rules layer already used, so
@@ -39,11 +46,21 @@ Classify the failure into exactly one of these root causes:
 - network_timeout: a gateway or bank connectivity problem, not a customer problem
 - expired_card: the card's expiry date has passed
 
+Also report how sure you are:
+- "high": the reason text clearly points at one of the five causes
+- "low": the reason text genuinely does not distinguish between two or
+  more causes, and you are picking the more likely one rather than the
+  certain one. Say "low" when that is true -- a low-confidence answer is
+  routed to a human for review, so it costs nothing to be honest, while a
+  wrong "high" causes money to move on a guess.
+
 Error code: {error_code}
 Error reason: {error_reason}
 
 Respond with JSON only, no prose:
-{{"root_cause": "<one of the five above>", "reasoning": "<one short sentence>"}}"""
+{{"root_cause": "<one of the five above>", "confidence": "<high or low>", "reasoning": "<one short sentence>"}}"""
+
+VALID_CONFIDENCES = {"high", "low"}
 
 
 def _default_llm(prompt: str) -> str:
@@ -96,9 +113,15 @@ def classify_with_llm(
             reasoning="llm returned an unusable response",
         )
 
+    # A missing or unrecognised confidence means we do not know how sure the
+    # model was. Default to "low" so decide() routes it to human review --
+    # the safe direction for an unknown is a person, not a money action.
+    confidence = parsed.get("confidence")
+    confidence = confidence if confidence in VALID_CONFIDENCES else "low"
+
     return ClassificationResult(
         root_cause=parsed["root_cause"],
-        confidence="high",
+        confidence=confidence,
         method="llm",
         reasoning=str(parsed.get("reasoning", ""))[:300],
     )
