@@ -216,3 +216,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Working notes kept locally, not part of the submission:
+# recording script, internal handoff, and the per-task briefs/reports
+# and plan from the build sessions.
+VIDEO_SCRIPT.md
+docs/HANDOFF.md
+docs/session-records/
+docs/superpowers/
