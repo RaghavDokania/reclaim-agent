@@ -162,7 +162,7 @@ The entire system is:
 - Bounded, gated decisions: stopping rules, confidence, value
 - Real Razorpay API calls, with simulated customer completion flagged as such
 - Full audit trail: query any payment, see every decision and why
-- A hundred and nine tests, zero network calls required
+- A hundred and fourteen tests, zero network calls required
 
 Open `dashboard.html` to see the live results. Run `python run_pipeline.py` to recover your own batch.
 

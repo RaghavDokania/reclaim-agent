@@ -131,7 +131,7 @@ Outcomes are drawn from the same assumed completion rates the act layer uses, ke
 python -m pytest
 ```
 
-109 tests, no network required — nothing in the suite reaches Supabase, Razorpay, or Groq. They cover the classifier's keyword/fallback logic, the LLM router's confidence mapping and its degrade-to-fallback paths, the decision policy's action mapping, stopping rules and both gates (including the exact ₹20,000 boundary), the approval workflow for held payments, the audit detail written for every decision, the metrics arithmetic, the simulated-outcome rates, the policy-comparison harness's determinism and accounting, the timestamp rebasing for reproducible runs, and the dashboard generator's formatting, sample selection and HTML escaping.
+114 tests, no network required — nothing in the suite reaches Supabase, Razorpay, or Groq. They cover the classifier's keyword/fallback logic, the LLM router's confidence mapping and its degrade-to-fallback paths, the decision policy's action mapping, stopping rules and both gates (including the exact ₹20,000 boundary), the approval workflow for held payments, the audit detail written for every decision, the metrics arithmetic, the simulated-outcome rates, the policy-comparison harness's determinism and accounting, the timestamp rebasing for reproducible runs, and the dashboard generator's formatting, sample selection, method counting, accuracy arithmetic and HTML escaping.
 
 ## What this doesn't do (yet)
 
