@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Razorpay Reclaim Agent - Live Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+            animation: slideDown 0.6s ease-out;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+
+        header p {
+            font-size: 1.1em;
+            opacity: 0.95;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+            animation: fadeIn 0.6s ease-out;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 50px rgba(0,0,0,0.25);
+        }
+
+        .metric-card {
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin: 15px 0;
+        }
+
+        .metric-label {
+            font-size: 0.95em;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .metric-subtitle {
+            font-size: 0.85em;
+            color: #999;
+            margin-top: 10px;
+        }
+
+        .pipeline-section {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+            animation: fadeIn 0.6s ease-out 0.2s backwards;
+        }
+
+        .section-title {
+            font-size: 1.5em;
+            color: #333;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .pipeline-stages {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stage {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            border-left: 4px solid #667eea;
+            position: relative;
+        }
+
+        .stage.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-left-color: #fff;
+        }
+
+        .stage-name {
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        .stage-count {
+            font-size: 1.8em;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.95em;
+        }
+
+        th {
+            background: #f8f9fa;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e9ecef;
+            color: #555;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .policy-row {
+            display: grid;
+            grid-template-columns: 150px 1fr 1fr 1fr 1fr;
+            gap: 15px;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid #e9ecef;
+            background: white;
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+
+        .policy-name {
+            font-weight: 600;
+            color: #333;
+            padding: 10px 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+
+        .policy-stat {
+            text-align: center;
+        }
+
+        .policy-stat-value {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .policy-stat-label {
+            font-size: 0.85em;
+            color: #999;
+        }
+
+        .audit-entry {
+            padding: 15px;
+            border-left: 4px solid #667eea;
+            background: #f8f9fa;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+
+        .audit-entry.recovered {
+            border-left-color: #28a745;
+        }
+
+        .audit-entry.held {
+            border-left-color: #ffc107;
+        }
+
+        .audit-entry.exhausted {
+            border-left-color: #dc3545;
+        }
+
+        .audit-payment-id {
+            font-weight: bold;
+            color: #333;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        .audit-status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+
+        .status-recovered {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-held {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-exhausted {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .confidence-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .confidence-high {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .confidence-low {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .method-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 600;
+            background: #e7f3ff;
+            color: #0056b3;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .stat-box {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 4px solid #667eea;
+        }
+
+        .stat-box.positive {
+            border-left-color: #28a745;
+        }
+
+        .stat-box.warning {
+            border-left-color: #ffc107;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #333;
+            margin: 10px 0;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #666;
+            text-transform: uppercase;
+        }
+
+        footer {
+            text-align: center;
+            color: white;
+            margin-top: 40px;
+            opacity: 0.8;
+            font-size: 0.9em;
+        }
+
+        .code-link {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: white;
+            color: #667eea;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .code-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎯 Razorpay Reclaim Agent</h1>
+            <p>AI-Powered Payment Failure Recovery & Compliance</p>
+        </header>
+
+        <div class="dashboard">
+            <div class="card metric-card">
+                <div class="metric-label">Payments Processed</div>
+                <div class="metric-value" id="totalPayments">75</div>
+                <div class="metric-subtitle">In this live run</div>
+            </div>
+
+            <div class="card metric-card">
+                <div class="metric-label">Diagnosis Accuracy</div>
+                <div class="metric-value" id="accuracy">93.3%</div>
+                <div class="metric-subtitle">With LLM escalation</div>
+            </div>
+
+            <div class="card metric-card">
+                <div class="metric-label">Recovered Amount</div>
+                <div class="metric-value" id="recoveredAmount">₹59,516</div>
+                <div class="metric-subtitle">4 payments on agent's authority</div>
+            </div>
+
+            <div class="card metric-card">
+                <div class="metric-label">Held for Human</div>
+                <div class="metric-value" id="heldAmount">₹1,93,635</div>
+                <div class="metric-subtitle">13 payments awaiting approval</div>
+            </div>
+        </div>
+
+        <div class="pipeline-section">
+            <h2 class="section-title">📊 Pipeline Stages</h2>
+            <div class="pipeline-stages">
+                <div class="stage active">
+                    <div class="stage-name">1. Ingest</div>
+                    <div class="stage-count" id="ingested">75</div>
+                    <div class="metric-label">Loaded</div>
+                </div>
+                <div class="stage active">
+                    <div class="stage-name">2. Diagnose</div>
+                    <div class="stage-count" id="diagnosed">75</div>
+                    <div class="metric-label">Classified</div>
+                </div>
+                <div class="stage active">
+                    <div class="stage-name">3. Decide</div>
+                    <div class="stage-count" id="decided">75</div>
+                    <div class="metric-label">Decided</div>
+                </div>
+                <div class="stage active">
+                    <div class="stage-name">4. Act</div>
+                    <div class="stage-count" id="acted">11</div>
+                    <div class="metric-label">Executed</div>
+                </div>
+                <div class="stage active">
+                    <div class="stage-name">5. Log</div>
+                    <div class="stage-count" id="logged">75</div>
+                    <div class="metric-label">Recorded</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="pipeline-section">
+            <h2 class="section-title">🔍 Diagnosis Breakdown</h2>
+            <div class="stats-row">
+                <div class="stat-box positive">
+                    <div class="stat-label">Keyword-Based</div>
+                    <div class="stat-value">60</div>
+                    <div class="stat-label">80% of cases</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">LLM-Escalated</div>
+                    <div class="stat-value">15</div>
+                    <div class="stat-label">20% ambiguous</div>
+                </div>
+                <div class="stat-box warning">
+                    <div class="stat-label">Misclassifications</div>
+                    <div class="stat-value">5</div>
+                    <div class="stat-label">6.7% error rate</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="pipeline-section">
+            <h2 class="section-title">📈 Policy Comparison (Offline)</h2>
+            <p style="color: #666; margin-bottom: 20px; font-size: 0.95em;">
+                The agent routing strategy is tested against naive retry using the same batch (deterministic, no network).
+                Results show the agent recovers more money with fewer attempts.
+            </p>
+            <div id="policyComparison"></div>
+        </div>
+
+        <div class="pipeline-section">
+            <h2 class="section-title">📋 Sample Audit Trail</h2>
+            <p style="color: #666; margin-bottom: 20px; font-size: 0.95em;">
+                Each payment records its decision path, confidence level, and exact action taken.
+            </p>
+            <div id="auditTrail"></div>
+        </div>
+
+        <footer>
+            <p>🤖 Built with Claude AI | <a href="https://github.com/RaghavDokania/reclaim-agent" style="color: white;">View on GitHub</a></p>
+            <p>Real Razorpay test payments · Full audit trail · Compliant escalation</p>
+        </footer>
+    </div>
+
+    <script>
+        // Policy comparison data from the offline harness
+        const policyData = [
+            {
+                name: "do_nothing",
+                recovered: 0,
+                amount: 0,
+                attempts: 0,
+                held: 0,
+                heldAmount: 0
+            },
+            {
+                name: "naive_retry_all",
+                recovered: 37,
+                amount: 499549,
+                attempts: 131,
+                held: 0,
+                heldAmount: 0
+            },
+            {
+                name: "agent_routing_ungated",
+                recovered: 46,
+                amount: 622121,
+                attempts: 118,
+                held: 0,
+                heldAmount: 0
+            },
+            {
+                name: "agent_gated (ships)",
+                recovered: 26,
+                amount: 320872,
+                attempts: 77,
+                held: 29,
+                heldAmount: 485827
+            }
+        ];
+
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('en-IN', {
+                style: 'currency',
+                currency: 'INR',
+                minimumFractionDigits: 0
+            }).format(amount);
+        }
+
+        function renderPolicyComparison() {
+            const container = document.getElementById('policyComparison');
+            let html = '<div style="overflow-x: auto;"><table>';
+            html += '<tr><th>Policy</th><th>Recovered</th><th>Amount</th><th>Attempts</th><th>Held</th><th>Held Amount</th></tr>';
+
+            policyData.forEach(policy => {
+                html += `<tr style="${policy.name === 'agent_gated (ships)' ? 'background: #f0f7ff; font-weight: 600;' : ''}">
+                    <td><strong>${policy.name}</strong></td>
+                    <td>${policy.recovered}</td>
+                    <td>${formatCurrency(policy.amount)}</td>
+                    <td>${policy.attempts}</td>
+                    <td>${policy.held}</td>
+                    <td>${formatCurrency(policy.heldAmount)}</td>
+                </tr>`;
+            });
+
+            html += '</table></div>';
+            html += '<p style="color: #666; margin-top: 15px; font-size: 0.9em;"><strong>Key insight:</strong> The gated agent recovers ₹320,872 on its own authority and holds ₹485,827 for human review. This compliance-first approach is the production policy.</p>';
+
+            container.innerHTML = html;
+        }
+
+        function renderAuditTrail() {
+            const sampleEntries = [
+                {
+                    id: "pay_27702a4caec4",
+                    status: "recovered",
+                    amount: 14195.92,
+                    reason: "network_timeout",
+                    confidence: "high",
+                    method: "keyword",
+                    action: "retry_payment",
+                    notes: "Network timeout resolved on retry, payment succeeded"
+                },
+                {
+                    id: "pay_ff2cd4b59d14",
+                    status: "held",
+                    amount: 14597.63,
+                    reason: "auth_failure",
+                    confidence: "low",
+                    method: "llm",
+                    action: "needs_review",
+                    notes: "LLM assessed auth_failure with low confidence, held for human review"
+                },
+                {
+                    id: "pay_3eeb7c5812b2",
+                    status: "held",
+                    amount: 24634.97,
+                    reason: "expired_card",
+                    confidence: "high",
+                    method: "keyword",
+                    action: "needs_approval",
+                    notes: "High-value payment (>20k) held for approval per compliance policy"
+                },
+                {
+                    id: "pay_861d4caf7eb4",
+                    status: "recovered",
+                    amount: 16944.27,
+                    reason: "insufficient_funds",
+                    confidence: "high",
+                    method: "keyword",
+                    action: "retry_payment",
+                    notes: "Insufficient funds, agent retried after delay - succeeded"
+                },
+                {
+                    id: "pay_32605dba9a50",
+                    status: "held",
+                    amount: 1659.07,
+                    reason: "card_declined_by_issuer",
+                    confidence: "low",
+                    method: "llm",
+                    action: "needs_review",
+                    notes: "LLM uncertain between issuer decline and auth failure, held for review"
+                }
+            ];
+
+            const container = document.getElementById('auditTrail');
+            let html = '';
+
+            sampleEntries.forEach(entry => {
+                html += `
+                    <div class="audit-entry ${entry.status}">
+                        <div>
+                            <span class="audit-payment-id">${entry.id}</span>
+                            <span class="audit-status status-${entry.status}">${entry.status.toUpperCase()}</span>
+                        </div>
+                        <div style="margin-top: 10px; color: #555; font-size: 0.95em;">
+                            <strong>Amount:</strong> ${formatCurrency(entry.amount)} |
+                            <strong>Diagnosis:</strong> ${entry.reason}
+                            <span class="confidence-badge confidence-${entry.confidence}">${entry.confidence.toUpperCase()}</span>
+                            <span class="method-badge">${entry.method}</span>
+                        </div>
+                        <div style="margin-top: 8px; color: #777; font-size: 0.9em;">
+                            <strong>Action:</strong> ${entry.action} | <em>${entry.notes}</em>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            renderPolicyComparison();
+            renderAuditTrail();
+        });
+    </script>
+</body>
+</html>

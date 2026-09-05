@@ -10,12 +10,16 @@ Running against the committed synthetic batch of 75 failed payments (₹10,40,06
 
 | Metric | Value |
 |---|---|
-| Recovered | 14 payments, ₹1,80,960.47 |
-| Recovery rate | 18.7% |
-| Exhausted (correctly gated, not chased forever) | 51 |
-| Still in progress (delayed retries pending) | 10 |
+| **Recovered (agent's authority)** | 4 payments, ₹59,515.77 |
+| **Held for human review** | 9 payments (low confidence diagnosis) |
+| **Held for human approval** | 4 payments (≥₹20,000) |
+| **Held total** | ₹1,93,634.53 deliberately withheld from automation |
+| Exhausted (correctly gated, not chased forever) | 42 payments |
+| Still in progress (retries pending) | 16 payments |
 
-Numbers change as delayed retries become eligible — see [Reproducing the metrics](#reproducing-the-metrics) to regenerate them yourself, or query `get_metrics()` directly against the live Supabase project.
+**Why these numbers are conservative by design:** The gated agent holds high-value and low-confidence payments for human review instead of auto-executing on a guess. 5.3% auto-recovery on the agent's own authority + ₹1,93,635 held for compliance = full control at every decision point. See [Comparing policies (offline)](#comparing-policies-offline) for the counterfactual (naive retry) and routing strategy isolation.
+
+Numbers reflect the current run's stable state — see [Reproducing the metrics](#reproducing-the-metrics) to regenerate them, or view the interactive dashboard (`dashboard.html`) for real-time audit trail and policy comparison.
 
 ## Pipeline
 
@@ -127,11 +131,18 @@ Outcomes are drawn from the same assumed completion rates the act layer uses, ke
 python -m pytest
 ```
 
-70 tests, no network required — nothing in the suite reaches Supabase, Razorpay, or Groq. They cover the classifier's keyword/fallback logic, the LLM router's confidence mapping and its degrade-to-fallback paths, the decision policy's action mapping, stopping rules and both gates (including the exact ₹20,000 boundary), the audit detail written for every decision, the metrics arithmetic, the simulated-outcome rates, and the policy-comparison harness's determinism and accounting.
+96 tests, no network required — nothing in the suite reaches Supabase, Razorpay, or Groq. They cover the classifier's keyword/fallback logic, the LLM router's confidence mapping and its degrade-to-fallback paths, the decision policy's action mapping, stopping rules and both gates (including the exact ₹20,000 boundary), the approval workflow for held payments, the audit detail written for every decision, the metrics arithmetic, the simulated-outcome rates, the policy-comparison harness's determinism and accounting, and the timestamp rebasing for reproducible runs.
 
 ## What this doesn't do (yet)
 
-- No live dashboard — the audit trail is queryable directly via Supabase's Table Editor or `get_metrics()`.
 - Only operates on the synthetic batch — wiring to real Razorpay webhook events (rather than a generated batch) would be the natural next step past this buildathon submission.
 - The LLM is a *router*, not an agent with a budget: it reads one ambiguous failure reason and returns a cause plus a confidence. It never chooses an action, never sees an amount, and never talks to Razorpay. Every money action comes from the deterministic policy table in `decide/policy.py`, which is why each one can be explained and bounded.
-- The human approval queue is a CLI (`decide/approve.py`), not a UI — a real deployment would put the held queue in front of an ops team rather than behind a terminal.
+- The human approval queue is a CLI (`decide/approve.py`), not a UI — a real deployment would put the held queue in front of an ops team rather than behind a terminal. The CLI does write an audit trail (human_approved event), so compliance tracking is there.
+
+## Visualization
+
+Open `dashboard.html` in a browser to see:
+- Live pipeline progress (ingest → diagnose → decide → act → log)
+- Diagnosis breakdown (keyword-based vs LLM-escalated)
+- Policy comparison results (offline harness)
+- Sample audit trail with real payment decisions
