@@ -43,7 +43,7 @@ The full pipeline (`ingest → diagnose → decide → act → log`) was already
 | `diagnose/llm_classifier.py` | Rules resolve clear cases; genuinely ambiguous reasons (~15/75) escalate to Groq `openai/gpt-oss-120b`, which returns a cause, its own confidence, and reasoning. Any LLM failure degrades to the `error_code` fallback — a payment is never left undiagnosed. | Live-verified. Accuracy **89.3% → 93.3%** end to end. |
 | `analysis/compare_policies.py` | Replays the committed batch offline under 4 policies. No network, no API key, deterministic. | Working. See §4. |
 | `decide/policy.py` gates | Confidence gate → `needs_review`; value gate (≥ ₹20,000) → `needs_approval`. Both come *after* the stopping rules, so an exhausted payment is never resurrected into a human queue. | Value gate live-verified. Confidence gate never fired live (see §7). |
-| `decide/approve.py` | `--list` the held queue, `--approve <payment_id>` to release one, logging `human_approved`. | **Fixed but NOT re-verified live.** |
+| `decide/approve.py` | `--list` the held queue, `--approve <payment_id>` to release one, logging `human_approved`. | **Verified live 2026-09-05** — see A-3 below. |
 | `log/db.py` `get_metrics()` | Added `held_for_review_count`, `held_for_approval_count`, `held_amount_inr`; `still_in_progress` now excludes held rows. | Working. |
 | `ingest/load_batch.py --rebase-timestamps` | Shifts the whole batch forward so its newest record lands at "now", preserving relative spacing. | **Fixed but NOT yet used in a full run.** |
 
@@ -72,7 +72,11 @@ Do not quote a single-seed figure. It ranges 3.4%–27.6% depending on seed, and
 
 Verdict at the time: **did not hold up**. Two criticals, both now fixed but unproven:
 
-- **A-3 (fixed, unverified):** the approval path was an infinite loop. `approve.py` set `status='diagnosed'`, then `run_decisions.py` re-applied the same gate ~11s later and re-held it. No held payment could *ever* be recovered — the escalation was nominal. Fix: durable `human_approved_at` column; `decide()` skips both gates when set, but stopping rules still apply first (approval authorises acting, it does not resurrect an exhausted payment).
+- **A-3 (fixed, VERIFIED LIVE 2026-09-05):** the approval path was an infinite loop. `approve.py` set `status='diagnosed'`, then `run_decisions.py` re-applied the same gate ~11s later and re-held it. No held payment could *ever* be recovered — the escalation was nominal. Fix: durable `human_approved_at` column; `decide()` skips both gates when set, but stopping rules still apply first (approval authorises acting, it does not resurrect an exhausted payment).
+
+  **Verification run, 2026-09-05:** `pay_c23f4a1ac1d849` (₹20,436.38, `insufficient_funds`, held by the value gate) was released with `approve.py --approve`, then a `run_decisions.py` pass moved it to `action_taken` with `retry_payment` — it did **not** return to the hold queue, which is the loop the defect described. `human_approved_at` persisted, and the `decided` audit event recorded `"gates skipped: a human approved this payment"`. The batch metrics moved coherently: approval queue 4 → 3, held total ₹1,93,634.53 → ₹1,73,198.15, a fall of exactly the payment's amount.
+
+  Still time-gated, not unverified: the retry itself is scheduled six hours out by the `insufficient_funds` delay, so this payment had not yet reached `recovered` at the time of writing. That last hop runs the same `act/` path that executed 11 actions successfully earlier in the same run.
 - **A-1 (fixed, unverified):** `run_actions.py` caught only `BadRequestError`. A `ServerError` escaped and killed the whole run, stranding 12 payments. Fix: catch every class in `razorpay.errors` (built dynamically — **the SDK has no shared base class**, all four subclass `Exception` directly) plus `requests.exceptions.RequestException`.
 - **D-1 (fixed, unverified):** the committed snapshot has absolute timestamps, so it decays. On that run 45/75 payments were already past the 72h window before it started, collapsing the recovery figure. Fix: `--rebase-timestamps`.
 

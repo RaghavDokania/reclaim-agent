@@ -21,7 +21,9 @@ For the webhook shot at the close, have a second terminal ready with the server 
 RAZORPAY_WEBHOOK_SECRET=whsec_demo python ingest/server.py
 ```
 
-`docs/webhook-demo.sh` sends one correctly signed event and one forged one, so the 200 and the 401 land back to back on camera.
+`docs/webhook-demo.sh` sends one correctly signed event, one redelivery and one forged one, so the 200, the duplicate and the 401 land back to back on camera.
+
+**If you run `approve.py --approve` on camera, the held figures change as you watch** — the queue drops by one and the held total falls by that payment's amount. That is a good thing to show, but read the numbers off the dashboard rather than the ones written below, and regenerate before the wide shot.
 
 The stream cards and every metric are read from the database at generate time.
 Payment IDs on screen will differ from run to run, so the script never names one.
@@ -30,7 +32,7 @@ Payment IDs on screen will differ from run to run, so the script never names one
 
 ## **[0:00–0:30] HOOK & PROBLEM**
 
-**Visual:** Show dashboard hero metrics (75 payments, 93.3% accuracy, ₹1.94L held)
+**Visual:** Show dashboard hero metrics (75 payments, 93.3% accuracy, ₹1.73L held)
 
 ---
 
@@ -120,15 +122,21 @@ But we apply *three gates, in order*.
 
 **Third gate: Value gate.** Anything at or above twenty thousand rupees needs human approval. Not automation.
 
-On this batch of 75 payments, 13 are held. Nine for review — low confidence diagnoses. Four for approval — high value.
+On this batch of 75 payments, twelve are held. Nine for review — low confidence diagnoses. Three for approval — high value.
 
-Total held: one lakh ninety-three thousand six hundred and thirty-four rupees.
+Total held: one lakh seventy-three thousand rupees.
 
 That's not money lost. That's the system working. That's compliance.
 
 The agent recovers 59,516 rupees on its own authority.
 
-A human can release the held ones with one command: `python decide/approve.py --approve <payment_id>`. Every approval is logged.
+A human can release one with a single command.
+
+```
+python decide/approve.py --approve <payment_id>
+```
+
+That payment leaves the hold queue, and the audit trail records why it was allowed to move: *gates skipped, a human approved this payment*. The stopping rules still apply — approval authorises acting on a payment, it does not resurrect one that already spent its retries.
 
 *[Pause 2 seconds]*
 
