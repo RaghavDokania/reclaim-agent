@@ -3,10 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reclaim Agent — Payment Recovery Dashboard</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>Reclaim Agent — Neural Recovery System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -15,611 +13,661 @@
         }
 
         :root {
-            --color-bg: #0f172a;
-            --color-surface: #1e293b;
-            --color-border: #334155;
-            --color-text: #e2e8f0;
-            --color-text-secondary: #cbd5e1;
-            --color-text-tertiary: #94a3b8;
-            --color-success: #10b981;
-            --color-decision: #8b5cf6;
-            --color-held: #f59e0b;
-            --color-focus: #06b6d4;
+            --color-bg: #0a0e27;
+            --color-grid: rgba(0, 255, 200, 0.03);
+            --color-border: rgba(0, 255, 200, 0.1);
+            --color-accent: #00ffc8;
+            --color-accent-secondary: #ff006e;
+            --color-accent-tertiary: #00d9ff;
+            --color-text: #e0e9ff;
+            --color-text-dim: #8892b0;
+            --color-success: #00ff88;
+            --color-warning: #ffb700;
+            --color-held: #ff4081;
         }
 
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-family: 'Space Grotesk', sans-serif;
             background: var(--color-bg);
+            background-image:
+                linear-gradient(rgba(0, 255, 200, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 200, 0.02) 1px, transparent 1px);
+            background-size: 50px 50px;
             color: var(--color-text);
             line-height: 1.6;
-            font-size: 15px;
-            font-feature-settings: "cv11" 1;
+            overflow-x: hidden;
         }
 
-        .page {
-            max-width: 1200px;
+        .viewport {
+            max-width: 1400px;
             margin: 0 auto;
-            padding: 48px 32px;
+            padding: 60px 40px;
         }
 
-        header {
-            margin-bottom: 64px;
-            border-bottom: 1px solid var(--color-border);
-            padding-bottom: 32px;
+        .header {
+            margin-bottom: 80px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -40px;
+            left: -40px;
+            right: -40px;
+            bottom: 20px;
+            background: linear-gradient(135deg, rgba(0, 255, 200, 0.05) 0%, rgba(255, 0, 110, 0.02) 100%);
+            border: 1px solid var(--color-border);
+            border-radius: 2px;
+            z-index: -1;
         }
 
         h1 {
-            font-size: 36px;
+            font-size: 48px;
             font-weight: 700;
+            letter-spacing: -0.03em;
+            margin-bottom: 8px;
+            background: linear-gradient(90deg, var(--color-accent), var(--color-accent-tertiary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-family: 'Space Mono', monospace;
+        }
+
+        .subtitle {
+            font-size: 14px;
+            color: var(--color-text-dim);
+            font-family: 'Space Mono', monospace;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        section {
+            margin-bottom: 100px;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 40px;
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .section-header::before {
+            content: '';
+            display: block;
+            width: 20px;
+            height: 2px;
+            background: var(--color-accent);
+            box-shadow: 0 0 12px rgba(0, 255, 200, 0.6);
+        }
+
+        .section-header::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--color-border);
+        }
+
+        /* Hero: Neural Stream */
+        .neural-stream {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+            margin-bottom: 60px;
+        }
+
+        .stream-card {
+            border: 1px solid var(--color-border);
+            background: linear-gradient(135deg, rgba(0, 255, 200, 0.05) 0%, rgba(0, 217, 255, 0.02) 100%);
+            padding: 28px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .stream-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--color-accent), transparent);
+            box-shadow: 0 0 20px rgba(0, 255, 200, 0.4);
+        }
+
+        .stream-card:hover {
+            background: linear-gradient(135deg, rgba(0, 255, 200, 0.1) 0%, rgba(0, 217, 255, 0.05) 100%);
+            border-color: var(--color-accent);
+            transform: translateY(-4px);
+            box-shadow: 0 20px 60px rgba(0, 255, 200, 0.1);
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--color-success);
+            box-shadow: 0 0 12px rgba(0, 255, 136, 0.8);
+            margin-right: 8px;
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        .status-indicator.warning {
+            background: var(--color-warning);
+            box-shadow: 0 0 12px rgba(255, 183, 0, 0.8);
+        }
+
+        .status-indicator.critical {
+            background: var(--color-held);
+            box-shadow: 0 0 12px rgba(255, 64, 129, 0.8);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .payment-id {
+            font-family: 'Space Mono', monospace;
+            font-size: 12px;
+            color: var(--color-accent-tertiary);
+            letter-spacing: 0.05em;
+            margin-bottom: 12px;
+        }
+
+        .amount-display {
+            font-size: 32px;
+            font-weight: 700;
+            font-family: 'Space Mono', monospace;
+            margin-bottom: 16px;
+            color: var(--color-text);
+            letter-spacing: -0.02em;
+        }
+
+        .metadata-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            font-size: 12px;
+        }
+
+        .metadata-item {
+            padding: 8px 0;
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        .metadata-label {
+            color: var(--color-text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-size: 10px;
+            margin-bottom: 3px;
+        }
+
+        .metadata-value {
+            color: var(--color-accent);
+            font-family: 'Space Mono', monospace;
+            font-size: 13px;
+        }
+
+        .metadata-value.high {
+            color: var(--color-success);
+        }
+
+        .metadata-value.low {
+            color: var(--color-warning);
+        }
+
+        /* Data Matrix */
+        .matrix-container {
+            border: 1px solid var(--color-border);
+            background: linear-gradient(135deg, rgba(0, 255, 200, 0.03) 0%, rgba(255, 0, 110, 0.01) 100%);
+            padding: 40px;
+            margin-bottom: 60px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .matrix-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--color-accent), transparent);
+        }
+
+        .matrix-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--color-text-dim);
+            margin-bottom: 30px;
+            font-family: 'Space Mono', monospace;
+        }
+
+        .metrics-array {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 24px;
+        }
+
+        .metric-cell {
+            position: relative;
+            padding: 20px;
+            border: 1px solid var(--color-border);
+            background: rgba(0, 255, 200, 0.02);
+        }
+
+        .metric-cell::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, var(--color-accent), transparent);
+        }
+
+        .metric-value-large {
+            font-size: 40px;
+            font-weight: 700;
+            font-family: 'Space Mono', monospace;
+            color: var(--color-accent);
+            line-height: 1;
             margin-bottom: 8px;
             letter-spacing: -0.02em;
         }
 
-        header p {
-            font-size: 15px;
-            color: var(--color-text-tertiary);
-            font-weight: 400;
-        }
-
-        section {
-            margin-bottom: 64px;
-        }
-
-        section > h2 {
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 32px;
-            color: var(--color-text);
-            letter-spacing: -0.01em;
-        }
-
-        /* Hero: Audit Trail */
-        .audit-hero {
-            background: var(--color-surface);
-            border: 1px solid var(--color-border);
-            border-radius: 8px;
-            padding: 32px;
-            margin-bottom: 48px;
-        }
-
-        .audit-hero-title {
-            font-size: 12px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: var(--color-text-tertiary);
-            margin-bottom: 16px;
-        }
-
-        .payment-journey {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 32px;
-            margin-bottom: 32px;
-        }
-
-        .journey-step {
-            position: relative;
-        }
-
-        .journey-step::after {
-            content: '';
-            position: absolute;
-            top: 24px;
-            left: 100%;
-            width: 20px;
-            height: 2px;
-            background: var(--color-border);
-        }
-
-        .journey-step:last-child::after {
-            display: none;
-        }
-
-        .step-label {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--color-text-tertiary);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 8px;
-        }
-
-        .step-value {
-            font-size: 28px;
-            font-weight: 700;
-            color: var(--color-text);
-            margin-bottom: 4px;
-        }
-
-        .step-detail {
-            font-size: 13px;
-            color: var(--color-text-tertiary);
-        }
-
-        /* Sample Payment Card */
-        .sample-payment {
-            background: var(--color-surface);
-            border: 1px solid var(--color-border);
-            border-radius: 8px;
-            padding: 24px;
-            margin-bottom: 24px;
-        }
-
-        .payment-header {
-            display: flex;
-            align-items: baseline;
-            gap: 16px;
-            margin-bottom: 24px;
-            padding-bottom: 16px;
-            border-bottom: 1px solid var(--color-border);
-        }
-
-        .payment-id {
-            font-family: 'Monaco', 'Courier New', monospace;
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--color-focus);
-            letter-spacing: 0.05em;
-        }
-
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 12px;
-            font-weight: 600;
-            padding: 4px 8px;
-            border-radius: 4px;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .status-recovered {
-            background: rgba(16, 185, 129, 0.15);
-            color: var(--color-success);
-        }
-
-        .status-held {
-            background: rgba(245, 158, 11, 0.15);
+        .metric-cell.held .metric-value-large {
             color: var(--color-held);
         }
 
-        .decision-tree {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-            gap: 16px;
-            margin-top: 16px;
+        .metric-cell.exhausted .metric-value-large {
+            color: var(--color-warning);
         }
 
-        .decision-node {
-            padding: 12px 16px;
-            background: rgba(15, 23, 42, 0.8);
-            border: 1px solid var(--color-border);
-            border-radius: 6px;
-            font-size: 13px;
-        }
-
-        .node-label {
+        .metric-label-small {
             font-size: 10px;
-            font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.1em;
-            color: var(--color-text-tertiary);
-            margin-bottom: 6px;
-        }
-
-        .node-value {
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--color-text);
-        }
-
-        .confidence-high {
-            color: var(--color-success);
-        }
-
-        .confidence-low {
-            color: var(--color-held);
-        }
-
-        /* Metrics Grid */
-        .metrics {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 24px;
-            margin-bottom: 48px;
-        }
-
-        .metric {
-            border-bottom: 2px solid var(--color-success);
-            padding-bottom: 16px;
-        }
-
-        .metric.held {
-            border-bottom-color: var(--color-held);
-        }
-
-        .metric.exhausted {
-            border-bottom-color: var(--color-text-tertiary);
-        }
-
-        .metric-label {
-            font-size: 12px;
-            font-weight: 500;
-            color: var(--color-text-tertiary);
-            margin-bottom: 8px;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .metric-value {
-            font-size: 32px;
-            font-weight: 700;
-            color: var(--color-text);
-            line-height: 1;
+            color: var(--color-text-dim);
             margin-bottom: 4px;
+            font-family: 'Space Mono', monospace;
         }
 
-        .metric-footnote {
-            font-size: 12px;
-            color: var(--color-text-tertiary);
+        .metric-detail {
+            font-size: 11px;
+            color: var(--color-text-dim);
+            margin-top: 6px;
         }
 
-        /* Data Viz */
-        .chart-container {
-            background: var(--color-surface);
+        /* Comparison Table */
+        .comparison-grid {
             border: 1px solid var(--color-border);
-            border-radius: 8px;
-            padding: 32px;
-            margin-bottom: 32px;
+            background: linear-gradient(135deg, rgba(0, 255, 200, 0.03) 0%, rgba(255, 0, 110, 0.01) 100%);
+            overflow: hidden;
+            margin-bottom: 60px;
         }
 
-        .chart-title {
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--color-text-secondary);
-            margin-bottom: 24px;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
-            font-size: 14px;
-        }
-
-        thead tr {
-            border-bottom: 2px solid var(--color-border);
-        }
-
-        th {
-            padding: 12px 0;
-            text-align: left;
-            font-weight: 600;
-            font-size: 12px;
-            color: var(--color-text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        tbody tr {
+        .comparison-header {
+            padding: 24px 40px;
             border-bottom: 1px solid var(--color-border);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--color-text-dim);
+            font-family: 'Space Mono', monospace;
         }
 
-        tbody tr:last-child {
+        .comparison-rows {
+            display: grid;
+        }
+
+        .comparison-row {
+            display: grid;
+            grid-template-columns: 200px repeat(5, 1fr);
+            gap: 0;
+            border-bottom: 1px solid var(--color-border);
+            padding: 20px 40px;
+            align-items: center;
+            transition: background 0.3s ease;
+        }
+
+        .comparison-row:hover {
+            background: rgba(0, 255, 200, 0.05);
+        }
+
+        .comparison-row.highlight {
+            background: linear-gradient(90deg, rgba(0, 255, 200, 0.1) 0%, rgba(255, 0, 110, 0.05) 100%);
+        }
+
+        .comparison-row:last-child {
             border-bottom: none;
         }
 
-        td {
-            padding: 16px 0;
+        .policy-name {
+            font-weight: 700;
+            font-size: 13px;
+            font-family: 'Space Mono', monospace;
+            color: var(--color-accent);
+        }
+
+        .comparison-row.highlight .policy-name {
+            color: var(--color-accent-secondary);
+        }
+
+        .comparison-value {
+            font-size: 13px;
+            font-family: 'Space Mono', monospace;
             color: var(--color-text);
+            text-align: right;
         }
 
-        td:first-child {
-            font-weight: 600;
-            color: var(--color-text);
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding-top: 40px;
+            border-top: 1px solid var(--color-border);
+            font-size: 11px;
+            color: var(--color-text-dim);
+            font-family: 'Space Mono', monospace;
+            letter-spacing: 0.05em;
         }
 
-        tbody tr:nth-child(even) {
-            background: rgba(226, 232, 240, 0.02);
+        .footer a {
+            color: var(--color-accent);
+            text-decoration: none;
+            transition: color 0.3s ease;
         }
 
-        .highlight-row td {
-            background: rgba(139, 92, 246, 0.1);
-            padding: 16px 16px;
-        }
-
-        .highlight-row td:first-child {
-            border-radius: 6px 0 0 6px;
-        }
-
-        .highlight-row td:last-child {
-            border-radius: 0 6px 6px 0;
-        }
-
-        /* Description text */
-        .description {
-            font-size: 14px;
-            color: var(--color-text-tertiary);
-            line-height: 1.8;
-            margin: 24px 0;
-            max-width: 700px;
+        .footer a:hover {
+            color: var(--color-accent-tertiary);
         }
 
         /* Responsive */
+        @media (max-width: 1024px) {
+            .comparison-row {
+                grid-template-columns: 150px 1fr;
+                gap: 20px;
+            }
+        }
+
         @media (max-width: 768px) {
-            .page {
-                padding: 32px 16px;
+            .viewport {
+                padding: 40px 20px;
             }
 
             h1 {
-                font-size: 28px;
+                font-size: 32px;
             }
 
-            section > h2 {
-                font-size: 16px;
-            }
-
-            .payment-journey {
+            .comparison-row {
                 grid-template-columns: 1fr;
-                gap: 16px;
+                gap: 8px;
             }
 
-            .journey-step::after {
-                display: none;
-            }
-
-            .metrics {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 16px;
+            .metrics-array {
+                grid-template-columns: 1fr 1fr;
             }
         }
 
-        /* Focus states */
-        a:focus-visible,
-        button:focus-visible {
-            outline: 2px solid var(--color-focus);
-            outline-offset: 2px;
-        }
-
-        /* Reduced motion */
+        /* Accessibility */
         @media (prefers-reduced-motion: reduce) {
-            * {
-                animation-duration: 0.01ms !important;
-                animation-iteration-count: 1 !important;
+            .stream-card,
+            .status-indicator,
+            .footer a {
+                transition: none;
             }
+
+            .status-indicator {
+                animation: none;
+            }
+        }
+
+        a:focus-visible {
+            outline: 2px solid var(--color-accent);
+            outline-offset: 4px;
         }
     </style>
 </head>
 <body>
-    <div class="page">
-        <header>
-            <h1>Reclaim Agent</h1>
-            <p>Payment recovery with complete decision transparency</p>
-        </header>
+    <div class="viewport">
+        <div class="header">
+            <h1>RECLAIM</h1>
+            <div class="subtitle">Neural Payment Recovery System</div>
+        </div>
 
-        <!-- HERO: Sample Payment Journey -->
+        <!-- Neural Stream -->
         <section>
-            <h2>Payment Decision Journey</h2>
-            <div class="audit-hero">
-                <div class="audit-hero-title">Example: Network Timeout Recovery</div>
+            <div class="section-header">Active Recovery Stream</div>
 
-                <div class="sample-payment">
-                    <div class="payment-header">
-                        <span class="payment-id">pay_27702a4caec4</span>
-                        <span class="status-badge status-recovered">✓ Recovered</span>
+            <div class="neural-stream">
+                <div class="stream-card">
+                    <div class="payment-id">pay_27702a4caec4</div>
+                    <div style="margin-bottom: 12px;">
+                        <span class="status-indicator"></span>
+                        <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;">Recovered</span>
                     </div>
-
-                    <div class="decision-tree">
-                        <div class="decision-node">
-                            <div class="node-label">Amount</div>
-                            <div class="node-value">₹14,195.92</div>
+                    <div class="amount-display">₹14,195.92</div>
+                    <div class="metadata-grid">
+                        <div class="metadata-item">
+                            <div class="metadata-label">Diagnosis</div>
+                            <div class="metadata-value high">Network Timeout</div>
                         </div>
-                        <div class="decision-node">
-                            <div class="node-label">Root Cause</div>
-                            <div class="node-value">Network Timeout</div>
+                        <div class="metadata-item">
+                            <div class="metadata-label">Confidence</div>
+                            <div class="metadata-value high">High</div>
                         </div>
-                        <div class="decision-node">
-                            <div class="node-label">Diagnosis</div>
-                            <div class="node-value"><span class="confidence-high">Keyword</span></div>
+                        <div class="metadata-item">
+                            <div class="metadata-label">Method</div>
+                            <div class="metadata-value">Keyword</div>
                         </div>
-                        <div class="decision-node">
-                            <div class="node-label">Confidence</div>
-                            <div class="node-value"><span class="confidence-high">High</span></div>
-                        </div>
-                        <div class="decision-node">
-                            <div class="node-label">Gates Passed</div>
-                            <div class="node-value">Yes</div>
-                        </div>
-                        <div class="decision-node">
-                            <div class="node-label">Action Taken</div>
-                            <div class="node-value">Retry (35%)</div>
+                        <div class="metadata-item">
+                            <div class="metadata-label">Gates</div>
+                            <div class="metadata-value high">Passed</div>
                         </div>
                     </div>
                 </div>
 
-                <div class="sample-payment">
-                    <div class="payment-header">
-                        <span class="payment-id">pay_ff2cd4b59d14</span>
-                        <span class="status-badge status-held">→ Held</span>
+                <div class="stream-card">
+                    <div class="payment-id">pay_ff2cd4b59d14</div>
+                    <div style="margin-bottom: 12px;">
+                        <span class="status-indicator critical"></span>
+                        <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;">Held</span>
                     </div>
+                    <div class="amount-display">₹14,597.63</div>
+                    <div class="metadata-grid">
+                        <div class="metadata-item">
+                            <div class="metadata-label">Diagnosis</div>
+                            <div class="metadata-value low">Auth Failure</div>
+                        </div>
+                        <div class="metadata-item">
+                            <div class="metadata-label">Confidence</div>
+                            <div class="metadata-value low">Low</div>
+                        </div>
+                        <div class="metadata-item">
+                            <div class="metadata-label">Method</div>
+                            <div class="metadata-value">LLM</div>
+                        </div>
+                        <div class="metadata-item">
+                            <div class="metadata-label">Gate</div>
+                            <div class="metadata-value low">Confidence</div>
+                        </div>
+                    </div>
+                </div>
 
-                    <div class="decision-tree">
-                        <div class="decision-node">
-                            <div class="node-label">Amount</div>
-                            <div class="node-value">₹14,597.63</div>
+                <div class="stream-card">
+                    <div class="payment-id">pay_3eeb7c5812b2</div>
+                    <div style="margin-bottom: 12px;">
+                        <span class="status-indicator critical"></span>
+                        <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;">Held</span>
+                    </div>
+                    <div class="amount-display">₹24,634.97</div>
+                    <div class="metadata-grid">
+                        <div class="metadata-item">
+                            <div class="metadata-label">Diagnosis</div>
+                            <div class="metadata-value">Expired Card</div>
                         </div>
-                        <div class="decision-node">
-                            <div class="node-label">Root Cause</div>
-                            <div class="node-value">Auth Failure</div>
+                        <div class="metadata-item">
+                            <div class="metadata-label">Confidence</div>
+                            <div class="metadata-value high">High</div>
                         </div>
-                        <div class="decision-node">
-                            <div class="node-label">Diagnosis</div>
-                            <div class="node-value"><span class="confidence-low">LLM</span></div>
+                        <div class="metadata-item">
+                            <div class="metadata-label">Method</div>
+                            <div class="metadata-value">Keyword</div>
                         </div>
-                        <div class="decision-node">
-                            <div class="node-label">Confidence</div>
-                            <div class="node-value"><span class="confidence-low">Low</span></div>
-                        </div>
-                        <div class="decision-node">
-                            <div class="node-label">Gate Failed</div>
-                            <div class="node-value">Confidence</div>
-                        </div>
-                        <div class="decision-node">
-                            <div class="node-label">Status</div>
-                            <div class="node-value">Needs Review</div>
+                        <div class="metadata-item">
+                            <div class="metadata-label">Gate</div>
+                            <div class="metadata-value low">Value (≥20k)</div>
                         </div>
                     </div>
                 </div>
             </div>
-
-            <p class="description">
-                Every payment is traceable. The audit trail records exactly why each decision was made: what the AI diagnosed, how confident it was, which gates applied, and what action (if any) was taken. Low-confidence diagnoses never trigger money movements — they wait for human review.
-            </p>
         </section>
 
-        <!-- Batch Metrics -->
+        <!-- Metrics Matrix -->
         <section>
-            <h2>This Run: 75 Payments</h2>
-            <div class="metrics">
-                <div class="metric">
-                    <div class="metric-label">Recovered</div>
-                    <div class="metric-value">4</div>
-                    <div class="metric-footnote">₹59,515.77 • 5.3%</div>
-                </div>
-                <div class="metric held">
-                    <div class="metric-label">Held for Review</div>
-                    <div class="metric-value">9</div>
-                    <div class="metric-footnote">Low confidence diagnosis</div>
-                </div>
-                <div class="metric held">
-                    <div class="metric-label">Held for Approval</div>
-                    <div class="metric-value">4</div>
-                    <div class="metric-footnote">≥ ₹20,000</div>
-                </div>
-                <div class="metric held">
-                    <div class="metric-label">Total Held</div>
-                    <div class="metric-value">₹1.93L</div>
-                    <div class="metric-footnote">₹1,93,634.53</div>
-                </div>
-                <div class="metric exhausted">
-                    <div class="metric-label">Exhausted</div>
-                    <div class="metric-value">42</div>
-                    <div class="metric-footnote">3 attempts or 72h passed</div>
-                </div>
-                <div class="metric exhausted">
-                    <div class="metric-label">In Progress</div>
-                    <div class="metric-value">16</div>
-                    <div class="metric-footnote">Delayed retries pending</div>
+            <div class="section-header">System Status: 75 Payment Batch</div>
+
+            <div class="matrix-container">
+                <div class="matrix-title">RUNTIME METRICS</div>
+                <div class="metrics-array">
+                    <div class="metric-cell">
+                        <div class="metric-value-large">4</div>
+                        <div class="metric-label-small">Recovered</div>
+                        <div class="metric-detail">₹59,515.77</div>
+                    </div>
+                    <div class="metric-cell held">
+                        <div class="metric-value-large">9</div>
+                        <div class="metric-label-small">Review Hold</div>
+                        <div class="metric-detail">Low Confidence</div>
+                    </div>
+                    <div class="metric-cell held">
+                        <div class="metric-value-large">4</div>
+                        <div class="metric-label-small">Approval Hold</div>
+                        <div class="metric-detail">≥ ₹20,000</div>
+                    </div>
+                    <div class="metric-cell held">
+                        <div class="metric-value-large">₹1.93L</div>
+                        <div class="metric-label-small">Total Held</div>
+                        <div class="metric-detail">₹1,93,634.53</div>
+                    </div>
+                    <div class="metric-cell exhausted">
+                        <div class="metric-value-large">42</div>
+                        <div class="metric-label-small">Exhausted</div>
+                        <div class="metric-detail">3 attempts / 72h</div>
+                    </div>
+                    <div class="metric-cell exhausted">
+                        <div class="metric-value-large">16</div>
+                        <div class="metric-label-small">In Progress</div>
+                        <div class="metric-detail">Retries Pending</div>
+                    </div>
                 </div>
             </div>
-
-            <p class="description">
-                The gated agent recovers ₹59,516 on its own authority. It holds ₹1,93,635 for human decision. No payment is moved on a low-confidence guess or a high-value amount without sign-off. This is compliance-first design.
-            </p>
         </section>
 
         <!-- Policy Comparison -->
         <section>
-            <h2>Policy Comparison</h2>
-            <div class="chart-container">
-                <div class="chart-title">Offline Harness: Same Batch, Four Policies</div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Policy</th>
-                            <th>Recovered</th>
-                            <th>Amount</th>
-                            <th>Attempts</th>
-                            <th>Held</th>
-                            <th>Held Amount</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>do_nothing</td>
-                            <td>0</td>
-                            <td>₹0</td>
-                            <td>0</td>
-                            <td>0</td>
-                            <td>₹0</td>
-                        </tr>
-                        <tr>
-                            <td>naive_retry_all</td>
-                            <td>37</td>
-                            <td>₹4,99,549</td>
-                            <td>131</td>
-                            <td>0</td>
-                            <td>₹0</td>
-                        </tr>
-                        <tr>
-                            <td>agent_routing_ungated</td>
-                            <td>46</td>
-                            <td>₹6,22,121</td>
-                            <td>118</td>
-                            <td>0</td>
-                            <td>₹0</td>
-                        </tr>
-                        <tr class="highlight-row">
-                            <td>agent_gated (ships)</td>
-                            <td>26</td>
-                            <td>₹3,20,872</td>
-                            <td>77</td>
-                            <td>29</td>
-                            <td>₹4,85,827</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+            <div class="section-header">Strategy Comparison Matrix</div>
 
-            <p class="description">
-                The ungated agent recovers 16% more than naive retry, proving the routing strategy beats blind retries. With gates on, the shipped agent recovers less on its own authority—but holds ₹4.86L for human sign-off. Two numbers, not one: money recovered automatically + money deliberately held = full compliance picture.
-            </p>
+            <div class="comparison-grid">
+                <div class="comparison-header">
+                    <div style="display: grid; grid-template-columns: 200px repeat(5, 1fr); gap: 0;">
+                        <div>Policy</div>
+                        <div>Recovered</div>
+                        <div>Amount</div>
+                        <div>Attempts</div>
+                        <div>Held</div>
+                        <div>Held Amount</div>
+                    </div>
+                </div>
+                <div class="comparison-rows">
+                    <div class="comparison-row">
+                        <div class="policy-name">do_nothing</div>
+                        <div class="comparison-value">0</div>
+                        <div class="comparison-value">₹0</div>
+                        <div class="comparison-value">0</div>
+                        <div class="comparison-value">0</div>
+                        <div class="comparison-value">₹0</div>
+                    </div>
+                    <div class="comparison-row">
+                        <div class="policy-name">naive_retry_all</div>
+                        <div class="comparison-value">37</div>
+                        <div class="comparison-value">₹4,99,549</div>
+                        <div class="comparison-value">131</div>
+                        <div class="comparison-value">0</div>
+                        <div class="comparison-value">₹0</div>
+                    </div>
+                    <div class="comparison-row">
+                        <div class="policy-name">agent_routing_ungated</div>
+                        <div class="comparison-value">46</div>
+                        <div class="comparison-value">₹6,22,121</div>
+                        <div class="comparison-value">118</div>
+                        <div class="comparison-value">0</div>
+                        <div class="comparison-value">₹0</div>
+                    </div>
+                    <div class="comparison-row highlight">
+                        <div class="policy-name">agent_gated (LIVE)</div>
+                        <div class="comparison-value">26</div>
+                        <div class="comparison-value">₹3,20,872</div>
+                        <div class="comparison-value">77</div>
+                        <div class="comparison-value">29</div>
+                        <div class="comparison-value">₹4,85,827</div>
+                    </div>
+                </div>
+            </div>
         </section>
 
         <!-- Diagnosis Breakdown -->
         <section>
-            <h2>Diagnosis Method Breakdown</h2>
-            <div class="chart-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Method</th>
-                            <th>Count</th>
-                            <th>Rate</th>
-                            <th>Approach</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>Keyword Rules</td>
-                            <td>60</td>
-                            <td>80%</td>
-                            <td>Fast, deterministic, no network calls</td>
-                        </tr>
-                        <tr>
-                            <td>LLM Escalation</td>
-                            <td>15</td>
-                            <td>20%</td>
-                            <td>Ambiguous cases where rules conflict</td>
-                        </tr>
-                        <tr>
-                            <td>Misclassifications</td>
-                            <td>5</td>
-                            <td>6.7%</td>
-                            <td>Edge cases, held for review</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+            <div class="section-header">Diagnosis Method Distribution</div>
 
-            <p class="description">
-                The classifier is two layers. Keywords handle clear cases fast. Ambiguous cases—where error text matches multiple categories—escalate to Groq's LLM with confidence scoring. If the LLM returns low confidence, the payment waits for a human. Any LLM failure falls back to error codes. A diagnosis is always produced.
-            </p>
+            <div class="comparison-grid">
+                <div class="comparison-header">
+                    <div style="display: grid; grid-template-columns: 200px repeat(3, 1fr); gap: 0;">
+                        <div>Method</div>
+                        <div>Count</div>
+                        <div>Rate</div>
+                        <div>Approach</div>
+                    </div>
+                </div>
+                <div class="comparison-rows">
+                    <div class="comparison-row">
+                        <div class="policy-name">Keyword Rules</div>
+                        <div class="comparison-value">60</div>
+                        <div class="comparison-value">80%</div>
+                        <div class="comparison-value" style="text-align: left;">Fast, deterministic</div>
+                    </div>
+                    <div class="comparison-row">
+                        <div class="policy-name">LLM Escalation</div>
+                        <div class="comparison-value">15</div>
+                        <div class="comparison-value">20%</div>
+                        <div class="comparison-value" style="text-align: left;">Ambiguous cases</div>
+                    </div>
+                    <div class="comparison-row">
+                        <div class="policy-name">Misclassifications</div>
+                        <div class="comparison-value">5</div>
+                        <div class="comparison-value">6.7%</div>
+                        <div class="comparison-value" style="text-align: left;">Edge cases held</div>
+                    </div>
+                </div>
+            </div>
         </section>
+
+        <div class="footer">
+            Reclaim Neural Recovery System | Real Razorpay API | Full Audit Trail<br>
+            Built for <a href="https://github.com/RaghavDokania/reclaim-agent">Razorpay AI Buildathon (Track 3)</a>
+        </div>
     </div>
 </body>
 </html>
