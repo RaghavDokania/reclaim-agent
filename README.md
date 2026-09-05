@@ -147,7 +147,7 @@ python -m pytest
 python dashboard/generate.py
 ```
 
-It reads `get_metrics()` plus the `failed_payments` rows, picks one real payment per outcome (recovered / held for review / held for approval), and renders `dashboard/template.html` into `dashboard.html`. Every number and payment id on the page came out of Supabase at generate time — so the page is never stale relative to the run, and the payment ids change from run to run.
+It reads `get_metrics()`, the `failed_payments` rows and the `diagnosed` audit events, picks one real payment per outcome (recovered / held for review / held for approval), and renders `dashboard/template.html` into `dashboard.html`. The runtime metrics, the stream cards and the diagnosis-method distribution all come out of Supabase at generate time, so they are never stale relative to the run and the payment ids change from run to run. The policy-comparison table is the one exception: it reports the offline harness, which is deterministic by design and does not depend on the live database.
 
 The arithmetic, the sample selection and the HTML escaping are unit-tested in `dashboard/test_generate.py` with no network access; only `main()` touches Supabase.
 

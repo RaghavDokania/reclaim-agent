@@ -570,20 +570,20 @@
                 <div class="comparison-rows">
                     <div class="comparison-row">
                         <div class="policy-name">Keyword Rules</div>
-                        <div class="comparison-value">60</div>
-                        <div class="comparison-value">80%</div>
+                        <div class="comparison-value">{{keyword_count}}</div>
+                        <div class="comparison-value">{{keyword_pct}}</div>
                         <div class="comparison-value" style="text-align: left;">Fast, deterministic</div>
                     </div>
                     <div class="comparison-row">
                         <div class="policy-name">LLM Escalation</div>
-                        <div class="comparison-value">15</div>
-                        <div class="comparison-value">20%</div>
+                        <div class="comparison-value">{{llm_count}}</div>
+                        <div class="comparison-value">{{llm_pct}}</div>
                         <div class="comparison-value" style="text-align: left;">Ambiguous cases</div>
                     </div>
                     <div class="comparison-row">
                         <div class="policy-name">Misclassifications</div>
-                        <div class="comparison-value">5</div>
-                        <div class="comparison-value">6.7%</div>
+                        <div class="comparison-value">{{misclassified_count}}</div>
+                        <div class="comparison-value">{{misclassified_pct}}</div>
                         <div class="comparison-value" style="text-align: left;">Edge cases held</div>
                     </div>
                 </div>

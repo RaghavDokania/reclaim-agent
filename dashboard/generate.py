@@ -118,6 +118,21 @@ def render_samples(samples):
     return "\n".join(cards)
 
 
+def count_methods(audit_rows):
+    counts = {}
+    for row in audit_rows:
+        method = (row.get("detail") or {}).get("method") or "code_fallback"
+        counts[method] = counts.get(method, 0) + 1
+    return counts
+
+
+def accuracy_pct(rows):
+    if not rows:
+        return 0
+    correct = sum(1 for r in rows if r["predicted_root_cause"] == r["root_cause"])
+    return round(correct / len(rows) * 100, 1)
+
+
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
     sys.path.insert(0, os.path.dirname(here))
@@ -127,9 +142,26 @@ def main():
     client = get_client()
     metrics = get_metrics(client)
     rows = client.table("failed_payments").select("*").execute().data
+    diagnosed = client.table("audit_log").select("detail").eq("event", "diagnosed").execute().data
 
     view = build_view_model(metrics, rows)
     view["samples_html"] = render_samples(view["samples"])
+
+    methods = count_methods(diagnosed)
+    total_diagnosed = sum(methods.values()) or 1
+    view["keyword_count"] = methods.get("keyword", 0)
+    view["llm_count"] = methods.get("llm", 0)
+    view["keyword_pct"] = f"{methods.get('keyword', 0) / total_diagnosed * 100:.0f}%"
+    view["llm_pct"] = f"{methods.get('llm', 0) / total_diagnosed * 100:.0f}%"
+
+    scored = [r for r in rows if r["predicted_root_cause"]]
+    view["accuracy_display"] = f"{accuracy_pct(scored)}%"
+    view["misclassified_count"] = sum(
+        1 for r in scored if r["predicted_root_cause"] != r["root_cause"]
+    )
+    view["misclassified_pct"] = (
+        f"{view['misclassified_count'] / len(scored) * 100:.1f}%" if scored else "0%"
+    )
 
     template_path = os.path.join(here, "template.html")
     output_path = os.path.join(os.path.dirname(here), "dashboard.html")

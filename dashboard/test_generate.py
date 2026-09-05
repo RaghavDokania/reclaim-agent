@@ -3,7 +3,14 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from generate import build_view_model, format_inr, render, render_samples
+from generate import (
+    accuracy_pct,
+    build_view_model,
+    count_methods,
+    format_inr,
+    render,
+    render_samples,
+)
 
 
 def _row(status, amount, root_cause="network_timeout", confidence="high", payment_id="pay_x"):
@@ -147,3 +154,41 @@ def test_a_scalar_placeholder_is_still_escaped():
     html = render(template, {"root_cause": "<script>"})
 
     assert "&lt;script&gt;" in html
+
+
+def test_method_counts_come_from_the_diagnosed_audit_events():
+    audit = [
+        {"detail": {"method": "keyword"}},
+        {"detail": {"method": "keyword"}},
+        {"detail": {"method": "llm"}},
+    ]
+
+    counts = count_methods(audit)
+
+    assert counts == {"keyword": 2, "llm": 1}
+
+
+def test_an_event_missing_its_method_is_counted_as_a_code_fallback():
+    counts = count_methods([{"detail": {}}])
+
+    assert counts == {"code_fallback": 1}
+
+
+def test_accuracy_compares_the_prediction_against_the_true_cause():
+    rows = [
+        {"root_cause": "auth_failure", "predicted_root_cause": "auth_failure"},
+        {"root_cause": "auth_failure", "predicted_root_cause": "card_declined_by_issuer"},
+        {"root_cause": "expired_card", "predicted_root_cause": "expired_card"},
+    ]
+
+    assert accuracy_pct(rows) == 66.7
+
+
+def test_accuracy_of_an_empty_batch_is_zero_rather_than_a_crash():
+    assert accuracy_pct([]) == 0
+
+
+def test_a_row_never_diagnosed_counts_against_accuracy():
+    rows = [{"root_cause": "auth_failure", "predicted_root_cause": None}]
+
+    assert accuracy_pct(rows) == 0.0
