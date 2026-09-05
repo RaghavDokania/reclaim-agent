@@ -457,124 +457,44 @@
         <section>
             <div class="section-header">Active Recovery Stream</div>
 
-            <div class="neural-stream">
-                <div class="stream-card">
-                    <div class="payment-id">pay_cb2e04dd969243</div>
-                    <div style="margin-bottom: 12px;">
-                        <span class="status-indicator"></span>
-                        <span class="stream-status">Recovered</span>
-                    </div>
-                    <div class="amount-display">₹ 14,120.93</div>
-                    <div class="metadata-grid">
-                        <div class="metadata-item">
-                            <div class="metadata-label">Diagnosis</div>
-                            <div class="metadata-value">network_timeout</div>
-                        </div>
-                        <div class="metadata-item">
-                            <div class="metadata-label">Confidence</div>
-                            <div class="metadata-value high">high</div>
-                        </div>
-                        <div class="metadata-item">
-                            <div class="metadata-label">Gate</div>
-                            <div class="metadata-value">Passed</div>
-                        </div>
-                        <div class="metadata-item">
-                            <div class="metadata-label">Status</div>
-                            <div class="metadata-value">recovered</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="stream-card">
-                    <div class="payment-id">pay_5d0279b14ca44f</div>
-                    <div style="margin-bottom: 12px;">
-                        <span class="status-indicator critical"></span>
-                        <span class="stream-status">Held</span>
-                    </div>
-                    <div class="amount-display">₹ 12,835.25</div>
-                    <div class="metadata-grid">
-                        <div class="metadata-item">
-                            <div class="metadata-label">Diagnosis</div>
-                            <div class="metadata-value">card_declined_by_issuer</div>
-                        </div>
-                        <div class="metadata-item">
-                            <div class="metadata-label">Confidence</div>
-                            <div class="metadata-value low">low</div>
-                        </div>
-                        <div class="metadata-item">
-                            <div class="metadata-label">Gate</div>
-                            <div class="metadata-value">Confidence</div>
-                        </div>
-                        <div class="metadata-item">
-                            <div class="metadata-label">Status</div>
-                            <div class="metadata-value">needs_review</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="stream-card">
-                    <div class="payment-id">pay_0e754cc951044e</div>
-                    <div style="margin-bottom: 12px;">
-                        <span class="status-indicator critical"></span>
-                        <span class="stream-status">Held</span>
-                    </div>
-                    <div class="amount-display">₹ 21,216.86</div>
-                    <div class="metadata-grid">
-                        <div class="metadata-item">
-                            <div class="metadata-label">Diagnosis</div>
-                            <div class="metadata-value">insufficient_funds</div>
-                        </div>
-                        <div class="metadata-item">
-                            <div class="metadata-label">Confidence</div>
-                            <div class="metadata-value high">high</div>
-                        </div>
-                        <div class="metadata-item">
-                            <div class="metadata-label">Gate</div>
-                            <div class="metadata-value">Value (&gt;= 20k)</div>
-                        </div>
-                        <div class="metadata-item">
-                            <div class="metadata-label">Status</div>
-                            <div class="metadata-value">needs_approval</div>
-                        </div>
-                    </div>
-                </div>
+            <div class="neural-stream">{{samples_html}}
             </div>
         </section>
 
         <!-- Metrics Matrix -->
         <section>
-            <div class="section-header">System Status: 75 Payment Batch</div>
+            <div class="section-header">System Status: {{total_batch_size}} Payment Batch</div>
 
             <div class="matrix-container">
                 <div class="matrix-title">RUNTIME METRICS</div>
                 <div class="metrics-array">
                     <div class="metric-cell">
-                        <div class="metric-value-large">4</div>
+                        <div class="metric-value-large">{{recovered_count}}</div>
                         <div class="metric-label-small">Recovered</div>
-                        <div class="metric-detail">₹ 59,515.77</div>
+                        <div class="metric-detail">{{recovered_amount_display}}</div>
                     </div>
                     <div class="metric-cell held">
-                        <div class="metric-value-large">9</div>
+                        <div class="metric-value-large">{{held_for_review_count}}</div>
                         <div class="metric-label-small">Review Hold</div>
                         <div class="metric-detail">Low Confidence</div>
                     </div>
                     <div class="metric-cell held">
-                        <div class="metric-value-large">4</div>
+                        <div class="metric-value-large">{{held_for_approval_count}}</div>
                         <div class="metric-label-small">Approval Hold</div>
                         <div class="metric-detail">≥ ₹20,000</div>
                     </div>
                     <div class="metric-cell held">
-                        <div class="metric-value-large">₹ 1.94L</div>
+                        <div class="metric-value-large">{{held_amount_display}}</div>
                         <div class="metric-label-small">Total Held</div>
-                        <div class="metric-detail">9 review + 4 approval</div>
+                        <div class="metric-detail">{{held_for_review_count}} review + {{held_for_approval_count}} approval</div>
                     </div>
                     <div class="metric-cell exhausted">
-                        <div class="metric-value-large">42</div>
+                        <div class="metric-value-large">{{exhausted_count}}</div>
                         <div class="metric-label-small">Exhausted</div>
                         <div class="metric-detail">3 attempts / 72h</div>
                     </div>
                     <div class="metric-cell exhausted">
-                        <div class="metric-value-large">16</div>
+                        <div class="metric-value-large">{{still_in_progress}}</div>
                         <div class="metric-label-small">In Progress</div>
                         <div class="metric-detail">Retries Pending</div>
                     </div>

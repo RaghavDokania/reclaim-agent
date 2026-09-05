@@ -131,7 +131,7 @@ Outcomes are drawn from the same assumed completion rates the act layer uses, ke
 python -m pytest
 ```
 
-96 tests, no network required — nothing in the suite reaches Supabase, Razorpay, or Groq. They cover the classifier's keyword/fallback logic, the LLM router's confidence mapping and its degrade-to-fallback paths, the decision policy's action mapping, stopping rules and both gates (including the exact ₹20,000 boundary), the approval workflow for held payments, the audit detail written for every decision, the metrics arithmetic, the simulated-outcome rates, the policy-comparison harness's determinism and accounting, and the timestamp rebasing for reproducible runs.
+109 tests, no network required — nothing in the suite reaches Supabase, Razorpay, or Groq. They cover the classifier's keyword/fallback logic, the LLM router's confidence mapping and its degrade-to-fallback paths, the decision policy's action mapping, stopping rules and both gates (including the exact ₹20,000 boundary), the approval workflow for held payments, the audit detail written for every decision, the metrics arithmetic, the simulated-outcome rates, the policy-comparison harness's determinism and accounting, the timestamp rebasing for reproducible runs, and the dashboard generator's formatting, sample selection and HTML escaping.
 
 ## What this doesn't do (yet)
 
@@ -141,8 +141,18 @@ python -m pytest
 
 ## Visualization
 
-Open `dashboard.html` in a browser to see:
-- Live pipeline progress (ingest → diagnose → decide → act → log)
-- Diagnosis breakdown (keyword-based vs LLM-escalated)
+`dashboard.html` is **generated from the live database**, not hand-written. Regenerate it any time the pipeline advances:
+
+```bash
+python dashboard/generate.py
+```
+
+It reads `get_metrics()` plus the `failed_payments` rows, picks one real payment per outcome (recovered / held for review / held for approval), and renders `dashboard/template.html` into `dashboard.html`. Every number and payment id on the page came out of Supabase at generate time — so the page is never stale relative to the run, and the payment ids change from run to run.
+
+The arithmetic, the sample selection and the HTML escaping are unit-tested in `dashboard/test_generate.py` with no network access; only `main()` touches Supabase.
+
+Open the result in a browser to see:
+- The active recovery stream — one real payment per outcome, with the gate that decided it
+- Runtime metrics (recovered, held for review, held for approval, exhausted, in progress)
 - Policy comparison results (offline harness)
-- Sample audit trail with real payment decisions
+- Diagnosis method distribution (keyword vs LLM escalation)

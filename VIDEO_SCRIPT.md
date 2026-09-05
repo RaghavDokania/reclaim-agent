@@ -6,9 +6,23 @@
 
 ---
 
+## **BEFORE RECORDING**
+
+Regenerate the dashboard so it shows current pipeline state:
+
+```bash
+python run_pipeline.py          # optional: advance any pending retries
+python dashboard/generate.py    # rewrites dashboard.html from live Supabase
+```
+
+The stream cards and every metric are read from the database at generate time.
+Payment IDs on screen will differ from run to run, so the script never names one.
+
+---
+
 ## **[0:00–0:30] HOOK & PROBLEM**
 
-**Visual:** Show dashboard hero metrics (75 payments, 93.3% accuracy, ₹1.93L held)
+**Visual:** Show dashboard hero metrics (75 payments, 93.3% accuracy, ₹1.94L held)
 
 ---
 
@@ -26,19 +40,19 @@ This is **Reclaim Agent** — an AI system that recovers failed payments with fu
 
 ## **[0:30–1:15] THE PROBLEM: A REAL EXAMPLE**
 
-**Visual:** Show audit trail example with payment ID `pay_27702a4caec4` → status: recovered
+**Visual:** Show the first card in the Active Recovery Stream (status: Recovered)
 
 ---
 
 Here's a real example from our live run.
 
-A customer's payment timed out due to a network issue. Amount: fourteen thousand rupees.
+A customer's payment timed out due to a network issue.
 
 A naive system has two options: retry immediately — frustrating the customer. Or give up — losing the money.
 
 Instead, here's what we do:
 
-We diagnose: *network timeout*. We know that retrying in two hours has a 35% success rate. We execute a real Razorpay API call. When the customer completes it, we recover ₹14,195.92.
+We diagnose: *network timeout*. We know that retrying in two hours has a 35% success rate. We execute a real Razorpay API call. When the customer completes it, we recover the amount shown on the card.
 
 Every decision is logged. Every artifact is real. Nothing is a guess.
 
@@ -79,8 +93,8 @@ Any LLM failure falls back to error codes. A diagnosis is *always* produced. A p
 
 ## **[2:30–3:45] COMPLIANCE-FIRST DECISIONS**
 
-**Visual:** Pipeline flow (5 stages) → Outcome breakdown cards  
-**Then:** Zoom to two held-payment audit entries (low confidence + high value)
+**Visual:** Runtime Metrics matrix  
+**Then:** Zoom to the two Held cards in the stream (low confidence + high value)
 
 ---
 
@@ -148,7 +162,7 @@ The entire system is:
 - Bounded, gated decisions: stopping rules, confidence, value
 - Real Razorpay API calls, with simulated customer completion flagged as such
 - Full audit trail: query any payment, see every decision and why
-- Ninety-six tests, zero network calls required
+- A hundred and nine tests, zero network calls required
 
 Open `dashboard.html` to see the live results. Run `python run_pipeline.py` to recover your own batch.
 
@@ -161,9 +175,9 @@ This is **Reclaim Agent** — payment recovery, built for compliance.
 ## **VISUAL CHECKLIST**
 
 - [ ] 0:00–0:30: Dashboard metrics hero shot (full screen)
-- [ ] 0:30–1:15: Audit trail scroll through one recovered payment
+- [ ] 0:30–1:15: First Recovered card in the Active Recovery Stream
 - [ ] 1:15–2:30: Classifier.py code + diagnosis stats
-- [ ] 2:30–3:45: Pipeline flow + outcome breakdown + held payment examples
+- [ ] 2:30–3:45: Runtime Metrics matrix + the two Held stream cards
 - [ ] 3:45–4:30: Policy comparison table (zoom/highlight key rows)
 - [ ] 4:30–5:00: File tree + dashboard final screenshot
 
