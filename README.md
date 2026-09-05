@@ -155,7 +155,7 @@ What the endpoint guarantees:
 python -m pytest
 ```
 
-142 tests, no network required — nothing in the suite reaches Supabase, Razorpay, or Groq. They cover the classifier's keyword/fallback logic, the LLM router's confidence mapping and its degrade-to-fallback paths, the decision policy's action mapping, stopping rules and both gates (including the exact ₹20,000 boundary), the approval workflow for held payments, the audit detail written for every decision, the metrics arithmetic, the simulated-outcome rates, the policy-comparison harness's determinism and accounting, the timestamp rebasing for reproducible runs, the dashboard generator's formatting, sample selection, method counting, accuracy arithmetic and HTML escaping, and the webhook layer's payload normalization, signature verification, idempotency and HTTP status contract.
+147 tests, no network required — nothing in the suite reaches Supabase, Razorpay, or Groq. They cover the classifier's keyword/fallback logic, the LLM router's confidence mapping and its degrade-to-fallback paths, the decision policy's action mapping, stopping rules and both gates (including the exact ₹20,000 boundary), the approval workflow for held payments, the audit detail written for every decision, the metrics arithmetic, the simulated-outcome rates, the policy-comparison harness's determinism and accounting, the timestamp rebasing for reproducible runs, the dashboard generator's formatting, sample selection, method counting, accuracy arithmetic and HTML escaping, and the webhook layer's payload normalization, signature verification, idempotency and HTTP status contract.
 
 ## What this doesn't do (yet)
 
