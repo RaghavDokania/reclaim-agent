@@ -10,16 +10,17 @@ Running against the committed synthetic batch of 75 failed payments (₹10,40,06
 
 | Metric | Value |
 |---|---|
+| **Diagnosis accuracy, end to end** | 93.3% (70/75) — rules 89.3%, plus the LLM layer |
 | **Recovered (agent's authority)** | 4 payments, ₹59,515.77 |
 | **Held for human review** | 9 payments (low confidence diagnosis) |
-| **Held for human approval** | 4 payments (≥₹20,000) |
-| **Held total** | ₹1,93,634.53 deliberately withheld from automation |
+| **Held for human approval** | 3 payments (≥₹20,000) |
+| **Held total** | ₹1,73,198.15 deliberately withheld from automation |
 | Exhausted (correctly gated, not chased forever) | 42 payments |
-| Still in progress (retries pending) | 16 payments |
+| Still in progress (retries pending) | 17 payments |
 
-**Why these numbers are conservative by design:** The gated agent holds high-value and low-confidence payments for human review instead of auto-executing on a guess. 5.3% auto-recovery on the agent's own authority + ₹1,93,635 held for compliance = full control at every decision point. See [Comparing policies (offline)](#comparing-policies-offline) for the counterfactual (naive retry) and routing strategy isolation.
+**Why these numbers are conservative by design:** The gated agent holds high-value and low-confidence payments for human review instead of auto-executing on a guess. 5.3% auto-recovery on the agent's own authority + ₹1,73,198 held for compliance = full control at every decision point. See [Comparing policies (offline)](#comparing-policies-offline) for the counterfactual (naive retry) and routing strategy isolation.
 
-Numbers reflect the current run's stable state — see [Reproducing the metrics](#reproducing-the-metrics) to regenerate them, or view the interactive dashboard (`dashboard.html`) for real-time audit trail and policy comparison.
+A fourth payment was held for approval until it was released with `decide/approve.py --approve`, which moved it back into the pipeline and dropped the held total by exactly its ₹20,436.38. Numbers reflect the current run's stable state — see [Reproducing the metrics](#reproducing-the-metrics) to regenerate them, or view the interactive dashboard (`dashboard.html`) for real-time audit trail and policy comparison.
 
 ## Pipeline
 
@@ -52,7 +53,7 @@ The first version of the classifier scored 100% — because the same person wrot
 
 The fix: `ingest/generate_synthetic_batch.py` draws each failure's `error_reason` from a pool of 4-5 realistic phrasings per category, a few of which are deliberately ambiguous across categories (e.g. "Transaction declined by bank" could plausibly mean either an issuer decline or an auth failure — even a human reading that line honestly couldn't tell). The classifier's rules in `diagnose/classifier.py` were written independently from general knowledge of how banks phrase declines, not copied from the generator. Result: a genuine 89.3% (67/75) for the keyword layer alone, and every misclassification clusters on that one ambiguous phrase — explainable, not arbitrary.
 
-That 89.3% is the *keyword layer's* score, measured offline and reproducible with no API key. It is exactly the population the LLM layer exists for: the 15 reasons the rules can't resolve are where the escalation earns its keep, and the end-to-end number depends on a live model call, so it is reported from a run rather than hardcoded here.
+That 89.3% is the *keyword layer's* score, measured offline and reproducible with no API key. It is exactly the population the LLM layer exists for: the 15 reasons the rules can't resolve are where the escalation earns its keep, and the end-to-end number depends on a live model call, so it is reported from a run rather than hardcoded as a permanent claim — the most recent is in [Live example](#live-example) above (93.3%, 70/75), and `diagnose/run_diagnosis.py` prints it every time it runs.
 
 ## Why some outcomes are simulated
 
