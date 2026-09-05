@@ -10,15 +10,18 @@ from generate import (
     format_inr,
     render,
     render_samples,
+    scoreable,
 )
 
 
-def _row(status, amount, root_cause="network_timeout", confidence="high", payment_id="pay_x"):
+def _row(status, amount, root_cause="network_timeout", confidence="high",
+         payment_id="pay_x", predicted=...):
     return {
         "payment_id": payment_id,
         "status": status,
         "amount_inr": amount,
         "root_cause": root_cause,
+        "predicted_root_cause": root_cause if predicted is ... else predicted,
         "diagnosis_confidence": confidence,
     }
 
@@ -81,6 +84,25 @@ def test_each_sample_carries_the_reason_it_landed_there():
 
     assert sample["gate"] == "Value (>= 20k)"
     assert sample["root_cause"] == "expired_card"
+
+
+def test_a_sample_shows_what_the_agent_predicted_not_the_hidden_answer():
+    # If the card showed ground truth, a misdiagnosis would look correct
+    # on screen -- the dashboard would flatter the agent it is reporting on.
+    rows = [_row("recovered", 100.0, root_cause="auth_failure",
+                 predicted="card_declined_by_issuer", payment_id="pay_wrong")]
+
+    sample = build_view_model(METRICS, rows)["samples"][0]
+
+    assert sample["root_cause"] == "card_declined_by_issuer"
+
+
+def test_an_undiagnosed_sample_says_so_rather_than_showing_nothing():
+    rows = [_row("recovered", 100.0, predicted=None, payment_id="pay_new")]
+
+    sample = build_view_model(METRICS, rows)["samples"][0]
+
+    assert sample["root_cause"] == "undiagnosed"
 
 
 def test_a_low_confidence_hold_names_the_confidence_gate():
@@ -192,3 +214,42 @@ def test_a_row_never_diagnosed_counts_against_accuracy():
     rows = [{"root_cause": "auth_failure", "predicted_root_cause": None}]
 
     assert accuracy_pct(rows) == 0.0
+
+
+def test_an_unscoreable_webhook_row_is_excluded_rather_than_counted_wrong():
+    # A live webhook row has no ground-truth root_cause. Once diagnosed it
+    # has a prediction and no answer to check it against, so scoring it
+    # would silently count every real payment as a misclassification.
+    rows = [
+        {"root_cause": "auth_failure", "predicted_root_cause": "auth_failure"},
+        {"root_cause": None, "predicted_root_cause": "network_timeout"},
+    ]
+
+    assert accuracy_pct(scoreable(rows)) == 100.0
+
+
+def test_a_row_with_ground_truth_but_no_prediction_yet_is_also_excluded():
+    rows = [
+        {"root_cause": "auth_failure", "predicted_root_cause": "auth_failure"},
+        {"root_cause": "expired_card", "predicted_root_cause": None},
+    ]
+
+    assert scoreable(rows) == [rows[0]]
+
+
+def test_a_webhook_row_without_a_root_cause_still_renders_as_a_sample():
+    # Live rows have no ground-truth root_cause; rendering must not crash
+    # on the None, and must not print "None" at the viewer either.
+    html = render_samples([
+        {
+            "payment_id": "pay_live",
+            "status": "recovered",
+            "amount_display": "₹ 1.00",
+            "root_cause": None,
+            "confidence": "high",
+            "gate": "Passed",
+        }
+    ])
+
+    assert "pay_live" in html
+    assert "None" not in html

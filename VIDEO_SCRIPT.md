@@ -15,6 +15,14 @@ python run_pipeline.py          # optional: advance any pending retries
 python dashboard/generate.py    # rewrites dashboard.html from live Supabase
 ```
 
+For the webhook shot at the close, have a second terminal ready with the server up:
+
+```bash
+RAZORPAY_WEBHOOK_SECRET=whsec_demo python ingest/server.py
+```
+
+`docs/webhook-demo.sh` sends one correctly signed event and one forged one, so the 200 and the 401 land back to back on camera.
+
 The stream cards and every metric are read from the database at generate time.
 Payment IDs on screen will differ from run to run, so the script never names one.
 
@@ -152,19 +160,24 @@ We're choosing both.
 
 ## **[4:30–5:00] CLOSE: THE FULL STACK**
 
-**Visual:** File tree (diagnose/, decide/, act/, log/) → Dashboard final shot
+**Visual:** Terminal running `python ingest/server.py`, then the curl/POST returning `{"status": "ingested"}`, then a forged signature returning 401 → Dashboard final shot
 
 ---
 
-The entire system is:
+One last thing — this isn't only a batch demo.
+
+`ingest/server.py` is a live endpoint for Razorpay's payment-failed webhook. Point a webhook at it and real failures enter the same pipeline, one event at a time.
+
+It verifies Razorpay's signature against the raw request body, so a forged POST to a public URL gets a 401. It refuses to start at all without a secret configured — it fails closed rather than quietly accepting anything. And because Razorpay redelivers until it gets a success, a repeat delivery is a no-op: re-inserting would hand a payment a fresh budget of retries it had already spent.
+
+So the whole system is:
 
 - Rules plus LLM diagnosis, with stated confidence
 - Bounded, gated decisions: stopping rules, confidence, value
 - Real Razorpay API calls, with simulated customer completion flagged as such
+- Live webhook ingestion, signed and idempotent
 - Full audit trail: query any payment, see every decision and why
-- A hundred and fourteen tests, zero network calls required
-
-Open `dashboard.html` to see the live results. Run `python run_pipeline.py` to recover your own batch.
+- A hundred and forty-two tests, zero network calls required
 
 This is **Reclaim Agent** — payment recovery, built for compliance.
 
@@ -179,7 +192,7 @@ This is **Reclaim Agent** — payment recovery, built for compliance.
 - [ ] 1:15–2:30: Classifier.py code + diagnosis stats
 - [ ] 2:30–3:45: Runtime Metrics matrix + the two Held stream cards
 - [ ] 3:45–4:30: Policy comparison table (zoom/highlight key rows)
-- [ ] 4:30–5:00: File tree + dashboard final screenshot
+- [ ] 4:30–5:00: Webhook server running + signed POST accepted + forged POST 401 + dashboard final shot
 
 ---
 

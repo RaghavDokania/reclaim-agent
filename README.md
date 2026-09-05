@@ -27,7 +27,7 @@ Numbers reflect the current run's stable state — see [Reproducing the metrics]
 ingest  ->  diagnose  ->  decide  ->  act  ->  log (throughout)
 ```
 
-- **`ingest/`** — generates a synthetic batch of failed payments (5 root causes, realistic proportions, deliberately varied and sometimes-ambiguous free-text error reasons) and loads it into Supabase.
+- **`ingest/`** — two ways in, same row shape. `generate_synthetic_batch.py` + `load_batch.py` produce and load a reproducible batch (5 root causes, realistic proportions, deliberately varied and sometimes-ambiguous free-text error reasons). `server.py` receives real Razorpay `payment.failed` webhooks one event at a time — see [Receiving live webhooks](#receiving-live-webhooks).
 - **`diagnose/`** — a two-layer router. A keyword classifier resolves unambiguous `error_reason` text deterministically and for free, scoring **89.3% on its own** (67/75 on the committed batch — a real, non-circular number, see [Why 89.3% and not 100%](#why-893-and-not-100)). The 15 of 75 reasons it *can't* resolve — text matching no category or more than one — escalate to an LLM (Groq, `openai/gpt-oss-120b`) that returns both a root cause and **its own confidence**, so a model that genuinely can't tell two causes apart says so instead of guessing. Any LLM failure degrades to the same `error_code` fallback, so a diagnosis is always produced.
 - **`decide/`** — maps each diagnosed root cause to a bounded recovery action (retry, payment link, or card-update prompt), subject to three controls applied in order:
   - **stopping rules** — max 3 lifetime attempts, and nothing older than 72 hours gets chased;
@@ -125,17 +125,42 @@ cd analysis && python compare_policies.py
 
 Outcomes are drawn from the same assumed completion rates the act layer uses, keyed per `(seed, payment_id)` so every policy faces identical luck on a given payment. The run is byte-for-byte reproducible across processes, and the routing-only lift is reported as a median and range across 20 seeds rather than one cherry-picked draw.
 
+## Receiving live webhooks
+
+The batch loader is for reproducible measurement. For live traffic, `ingest/server.py` accepts Razorpay's `payment.failed` webhook:
+
+```bash
+pip install -r requirements.txt
+python ingest/server.py       # listens on :5000
+ngrok http 5000               # Razorpay needs a public https URL
+```
+
+Then in the Razorpay dashboard: **Settings → Webhooks → Add New Webhook**, point it at `https://<your-ngrok>.ngrok.io/webhook/razorpay`, subscribe it to `payment.failed`, and copy the secret Razorpay generates into `RAZORPAY_WEBHOOK_SECRET`.
+
+What the endpoint guarantees:
+
+| Behaviour | Why it matters |
+|---|---|
+| Verifies `X-Razorpay-Signature` against the **raw** request body, using `hmac.compare_digest` | Anyone can POST to a public URL. Verifying a re-serialized body would reject valid events; a plain `==` would leak the signature through timing. |
+| Refuses to start with no `RAZORPAY_WEBHOOK_SECRET` | Fails closed. A misconfigured deployment stops, rather than quietly accepting every unsigned request. |
+| A redelivered event is a no-op, answered `200 {"status": "duplicate"}` | Razorpay redelivers until it gets a 2xx. Re-inserting would reset `attempt_count` and hand a payment a fresh budget of retries it had already spent. |
+| Unrelated events answered `200 {"status": "ignored"}` | A `4xx` would make Razorpay retry an event we were never going to act on, forever. |
+| Amounts converted from paise; timestamps from unix epoch | Razorpay's units, not the table's. Getting either wrong silently corrupts every downstream money decision, so both are pinned by tests. |
+
+**A live event carries no `root_cause`.** That column is the synthetic batch's ground-truth label, and the accuracy figure is measured against it. Webhook rows deliberately leave it unset rather than inventing an answer — so they flow through diagnose → decide → act normally, but they are not scored, because nobody knows the true cause of a real failure.
+
 ## Testing
 
 ```bash
 python -m pytest
 ```
 
-114 tests, no network required — nothing in the suite reaches Supabase, Razorpay, or Groq. They cover the classifier's keyword/fallback logic, the LLM router's confidence mapping and its degrade-to-fallback paths, the decision policy's action mapping, stopping rules and both gates (including the exact ₹20,000 boundary), the approval workflow for held payments, the audit detail written for every decision, the metrics arithmetic, the simulated-outcome rates, the policy-comparison harness's determinism and accounting, the timestamp rebasing for reproducible runs, and the dashboard generator's formatting, sample selection, method counting, accuracy arithmetic and HTML escaping.
+142 tests, no network required — nothing in the suite reaches Supabase, Razorpay, or Groq. They cover the classifier's keyword/fallback logic, the LLM router's confidence mapping and its degrade-to-fallback paths, the decision policy's action mapping, stopping rules and both gates (including the exact ₹20,000 boundary), the approval workflow for held payments, the audit detail written for every decision, the metrics arithmetic, the simulated-outcome rates, the policy-comparison harness's determinism and accounting, the timestamp rebasing for reproducible runs, the dashboard generator's formatting, sample selection, method counting, accuracy arithmetic and HTML escaping, and the webhook layer's payload normalization, signature verification, idempotency and HTTP status contract.
 
 ## What this doesn't do (yet)
 
-- Only operates on the synthetic batch — wiring to real Razorpay webhook events (rather than a generated batch) would be the natural next step past this buildathon submission.
+- The webhook listener handles `payment.failed` only. Other Razorpay events are acknowledged and ignored rather than acted on.
+- The listener writes the row and returns; diagnosis runs on the next `run_pipeline.py` pass rather than inline. Acting inside the request would risk Razorpay's delivery timeout, and a redelivery mid-diagnosis is harder to reason about than a redelivery that hits the idempotency check and stops.
 - The LLM is a *router*, not an agent with a budget: it reads one ambiguous failure reason and returns a cause plus a confidence. It never chooses an action, never sees an amount, and never talks to Razorpay. Every money action comes from the deterministic policy table in `decide/policy.py`, which is why each one can be explained and bounded.
 - The human approval queue is a CLI (`decide/approve.py`), not a UI — a real deployment would put the held queue in front of an ops team rather than behind a terminal. The CLI does write an audit trail (human_approved event), so compliance tracking is there.
 

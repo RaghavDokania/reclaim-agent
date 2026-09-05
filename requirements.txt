@@ -2,6 +2,7 @@
 razorpay          # official Python SDK, for test-mode API calls
 requests          # razorpay's own transport; act/run_actions.py catches its exceptions directly
 supabase          # for the audit trail / metrics database
+flask             # receives Razorpay's payment.failed webhook (ingest/server.py)
 
 # Diagnosis / decision layer
 langchain-groq        # LLM escalation for ambiguous failure reasons

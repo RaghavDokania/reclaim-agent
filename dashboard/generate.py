@@ -48,7 +48,9 @@ def _sample(row):
         "status": row["status"],
         "amount_inr": row["amount_inr"],
         "amount_display": format_inr(row["amount_inr"]),
-        "root_cause": row["root_cause"],
+        # What the agent concluded, never the hidden ground truth --
+        # showing root_cause here would make a misdiagnosis look correct.
+        "root_cause": row.get("predicted_root_cause") or "undiagnosed",
         "confidence": row.get("diagnosis_confidence") or "high",
         "gate": GATE_BY_STATUS.get(row["status"], "-"),
     }
@@ -98,7 +100,7 @@ def render_samples(samples):
             '                    <div class="metadata-grid">\n'
             '                        <div class="metadata-item">\n'
             '                            <div class="metadata-label">Diagnosis</div>\n'
-            f'                            <div class="metadata-value">{escape(s["root_cause"])}</div>\n'
+            f'                            <div class="metadata-value">{escape(s["root_cause"] or "undiagnosed")}</div>\n'
             '                        </div>\n'
             '                        <div class="metadata-item">\n'
             '                            <div class="metadata-label">Confidence</div>\n'
@@ -124,6 +126,16 @@ def count_methods(audit_rows):
         method = (row.get("detail") or {}).get("method") or "code_fallback"
         counts[method] = counts.get(method, 0) + 1
     return counts
+
+
+def scoreable(rows):
+    """Rows the accuracy figure can honestly be measured on.
+
+    Needs both a prediction and a ground-truth label. Live webhook rows
+    have no root_cause, so scoring them would count every real payment as
+    a miss and quietly drag the published accuracy down.
+    """
+    return [r for r in rows if r.get("predicted_root_cause") and r.get("root_cause")]
 
 
 def accuracy_pct(rows):
@@ -154,7 +166,7 @@ def main():
     view["keyword_pct"] = f"{methods.get('keyword', 0) / total_diagnosed * 100:.0f}%"
     view["llm_pct"] = f"{methods.get('llm', 0) / total_diagnosed * 100:.0f}%"
 
-    scored = [r for r in rows if r["predicted_root_cause"]]
+    scored = scoreable(rows)
     view["accuracy_display"] = f"{accuracy_pct(scored)}%"
     view["misclassified_count"] = sum(
         1 for r in scored if r["predicted_root_cause"] != r["root_cause"]
